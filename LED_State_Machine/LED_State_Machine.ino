@@ -29,8 +29,8 @@ void setup() {
   pinMode(switch_2, INPUT_PULLUP);
   
   // set up interrupts
-  attachInterrupt(0, change_state, FALLING);
-  attachInterrupt(1, change_state, FALLING);
+  attachInterrupt(0, change_state, CHANGE);
+  attachInterrupt(1, change_state, CHANGE);
 }
 
 // the loop routine runs over and over again forever:
@@ -67,7 +67,10 @@ void perform_off()
 
 void perform_running()
 {
-  
+  delay(100);
+  digitalWrite(led_b, HIGH);
+  delay(100);
+  digitalWrite(led_b, LOW);
 }
 
 void perform_sleep()
@@ -90,11 +93,15 @@ void perform_diagnostic()
 
 void change_state()
 {
-  switch_val_1 = digitalRead(switch_1);
-  switch_val_2 = digitalRead(switch_2);
+  int switch_val_1 = digitalRead(switch_1);
+  int switch_val_2 = digitalRead(switch_2);
   
   if(switch_val_1 == HIGH && switch_val_2 == HIGH)
-    state = 3;
-  if 
-  
+    state = 3;  // diagnostic
+  if(switch_val_1 == HIGH && switch_val_2 == LOW)
+    state = 1;  // running
+  if (switch_val_1 == LOW && switch_val_2 == LOW)
+    state = 0;  // off
+  if (switch_val_1 == LOW && switch_val_2 == HIGH)
+    state = 2;  // sleep
 }
