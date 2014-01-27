@@ -5,11 +5,16 @@
 Modules – Logic, collision detection, toxin detection, communication, drive, power
 
 Power
-•	Input: 9V battery \n
+•	Input: 9V battery
+
 •	Output:
+
     o	Power Supply H (Vcc_H) – high current power supply (250 mA to 2A)
+
     o	Power Supply L (Vcc_L) – low current power supply (0-250 mA)
+
 •	Functionality: deliver power to all modules
+
 Collision
 •	Input: Vcc_L, actuator
 •	Output: collision interrupt to main logic
