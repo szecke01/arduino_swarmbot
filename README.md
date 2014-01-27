@@ -1,10 +1,11 @@
-Arduino Swarmbot for Toxic Waste First-Response
-Specification
+# Arduino Swarmbot for Toxic Waste First-Response
+
+## Specification
 
 Modules – Logic, collision detection, toxin detection, communication, drive, power
 
 Power
-•	Input: 9V battery
+•	Input: 9V battery \n
 •	Output:
     o	Power Supply H (Vcc_H) – high current power supply (250 mA to 2A)
     o	Power Supply L (Vcc_L) – low current power supply (0-250 mA)
