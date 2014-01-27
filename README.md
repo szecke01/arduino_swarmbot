@@ -1,7 +1,9 @@
-## Arduino Swarmbot for Toxic Waste First-Response
-### Specification
+# Arduino Swarmbot for Toxic Waste First-Response
+## Specification
 
-Modules – Logic, collision detection, toxin detection, communication, drive, power
+Modules – Logic, collision detection, toxin detection, 
+communication, 
+drive, power
 
 Power:
 •	Input: 9V battery
