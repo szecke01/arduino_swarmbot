@@ -2,8 +2,8 @@
 ## Specification
 
 #### Power:  
-*	Input: 9V battery  
-*	Output:  
+*	Input: 9V battery, Activation Switch 
+*	Output: 
   * Power Supply H (Vcc_H) – high current power supply (250 mA to 2A)  
   * Power Supply L (Vcc_L) – low current power supply (0-250 mA)  
 *	Functionality: deliver power to all modules  
