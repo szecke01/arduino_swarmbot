@@ -1,9 +1,11 @@
 # Arduino Swarmbot for Toxic Waste First-Response  
 ## Specification
 
+Our swarmbot is composed of six independent modules designed to promote the singular purpose of toxic waste identification for large-scale disaster first response. The robot must perform several actions that represent prototypical situations that would arise in a natural or man-made disaster, such as a toxic oil spill. The robot must be able to identify the surface of the floor beneath it to determine its chemical safety, recover from collisions with various obstacles, and communicate unsafe zones with another robot. Ideally, the robot must be lightweight to maximize battery efficiency, small enough volumetrically to maneuver throughout the environment, and must move quickly enough to perform the task in a timely fashion (roughly 90 seconds), but not so fast as to be inaccurate in its analysis or self-damaging (TBD). 
+
 #### Power:  
-*	Input: 9V battery, Activation Switch 
-*	Output: 
+*	Input: 9V battery  
+*	Output:  
   * Power Supply H (Vcc_H) – high current power supply (250 mA to 2A)  
   * Power Supply L (Vcc_L) – low current power supply (0-250 mA)  
 *	Functionality: deliver power to all modules  
