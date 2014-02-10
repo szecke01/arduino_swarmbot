@@ -15,15 +15,23 @@ const int MOTOR_RIGHT_F = 5;
 const int MOTOR_RIGHT_R = 3;
 
 // State values
-const int STATE_STOPPED  = 0;
-const int STATE_FORWARD = 1;
-const int STATE_REVERSE  = 2;
-const int STATE_ROT_CCW  = 3;
-const int STATE_ROT_CW   = 4;
+const int STATE_STOPPED    = 0;
+const int STATE_FORWARD    = 1;
+const int STATE_REVERSE    = 2;
+const int STATE_PIVOT_CCW  = 3;
+const int STATE_PIVOT_CW   = 4;
+const int STATE_TURN_CCW   = 5;
+const int STATE_TURN_CW    = 6;
+
+// Motor Constants
+const float TURN_SPEED_RATIO = .25;
+const int STATE_CHANGE_DELAY = 2000;
+const int PIVOT_TIME = 630;
 
 // Current arduino state
 int current_state;
-int motor_duty_cycle;
+float motor_duty_cycle;
+
 
 void setup() {
   
@@ -35,7 +43,7 @@ void setup() {
   
   // Initialize state machine to desired initial state
   set_state(STATE_FORWARD);
-  motor_duty_cycle = 1;  
+  motor_duty_cycle = .8;  
   
   //pinMode(motor_enable, INPUT_PULLUP);
   //digitalWrite(motor_pin, LOW);
@@ -73,45 +81,69 @@ void loop() {
     analogWrite(MOTOR_RIGHT_F, duty_cycle_to_byte(0));
     analogWrite(MOTOR_RIGHT_R, duty_cycle_to_byte(motor_duty_cycle));
     delay(1000);
-    set_state(STATE_ROT_CCW);
+    set_state(STATE_TURN_CCW);
   }  
   
-  if (current_state == STATE_ROT_CW)
+  if (current_state == STATE_PIVOT_CW)
   {
     analogWrite(MOTOR_LEFT_F,  duty_cycle_to_byte(motor_duty_cycle));
     analogWrite(MOTOR_LEFT_R,  duty_cycle_to_byte(0));
     analogWrite(MOTOR_RIGHT_F, duty_cycle_to_byte(0));
     analogWrite(MOTOR_RIGHT_R, duty_cycle_to_byte(motor_duty_cycle));    
-    delay(1000);
+    delay(PIVOT_TIME);
     set_state(STATE_STOPPED); 
   }
   
-  if (current_state == STATE_ROT_CCW)
+  if (current_state == STATE_PIVOT_CCW)
   {
     analogWrite(MOTOR_LEFT_F,  duty_cycle_to_byte(0));
     analogWrite(MOTOR_LEFT_R,  duty_cycle_to_byte(motor_duty_cycle));
     analogWrite(MOTOR_RIGHT_F, duty_cycle_to_byte(motor_duty_cycle));
     analogWrite(MOTOR_RIGHT_R, duty_cycle_to_byte(0));    
+    delay(PIVOT_TIME);
+    set_state(STATE_PIVOT_CW);
+  }
+  if (current_state == STATE_TURN_CW)
+  {
+    analogWrite(MOTOR_LEFT_F,  duty_cycle_to_byte(motor_duty_cycle*TURN_SPEED_RATIO));
+    analogWrite(MOTOR_LEFT_R,  duty_cycle_to_byte(0));
+    analogWrite(MOTOR_RIGHT_F, duty_cycle_to_byte(motor_duty_cycle));
+    analogWrite(MOTOR_RIGHT_R, duty_cycle_to_byte(0));    
     delay(1000);
-    set_state(STATE_ROT_CW);
+    set_state(STATE_PIVOT_CCW);
+  }
+  if (current_state == STATE_TURN_CCW)
+  {
+    analogWrite(MOTOR_LEFT_F,  duty_cycle_to_byte(motor_duty_cycle));
+    analogWrite(MOTOR_LEFT_R,  duty_cycle_to_byte(0));
+    analogWrite(MOTOR_RIGHT_F, duty_cycle_to_byte(motor_duty_cycle*TURN_SPEED_RATIO));
+    analogWrite(MOTOR_RIGHT_R, duty_cycle_to_byte(0));    
+    delay(1000);
+    set_state(STATE_TURN_CW);
   }
 }
 
 // Sets state and gives delay
 void set_state(int new_state)
 {
-  delay(100);
+  stop_motor();
+  delay(STATE_CHANGE_DELAY);
+  current_state = new_state;
+}
+
+// Sets analog out for motor to zero
+void stop_motor()
+{
   analogWrite(MOTOR_LEFT_F,  duty_cycle_to_byte(0));
   analogWrite(MOTOR_LEFT_R,  duty_cycle_to_byte(0));
   analogWrite(MOTOR_RIGHT_F, duty_cycle_to_byte(0));
-  analogWrite(MOTOR_RIGHT_R, duty_cycle_to_byte(0));    
-  current_state = new_state;
+  analogWrite(MOTOR_RIGHT_R, duty_cycle_to_byte(0));  
 }
+
 
 // Converts duty cycle in decimal (between 0 & 1)
 // to byte for analog read
 byte duty_cycle_to_byte(float duty)
 {
-
   return (byte) (duty * 255);
 }
