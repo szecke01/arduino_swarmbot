@@ -26,7 +26,8 @@ const int STATE_TURN_CW    = 6;
 // Motor Constants
 const float TURN_SPEED_RATIO = .25;
 const int STATE_CHANGE_DELAY = 2000;
-const int PIVOT_TIME = 630;
+const int PIVOT_TIME_90 = 630;
+const int PIVOT_TIME_60 = 420;
 
 // Current arduino state
 int current_state;
@@ -86,21 +87,13 @@ void loop() {
   
   if (current_state == STATE_PIVOT_CW)
   {
-    analogWrite(MOTOR_LEFT_F,  duty_cycle_to_byte(motor_duty_cycle));
-    analogWrite(MOTOR_LEFT_R,  duty_cycle_to_byte(0));
-    analogWrite(MOTOR_RIGHT_F, duty_cycle_to_byte(0));
-    analogWrite(MOTOR_RIGHT_R, duty_cycle_to_byte(motor_duty_cycle));    
-    delay(PIVOT_TIME);
+    pivot_cw(PIVOT_TIME_60);
     set_state(STATE_STOPPED); 
   }
   
   if (current_state == STATE_PIVOT_CCW)
   {
-    analogWrite(MOTOR_LEFT_F,  duty_cycle_to_byte(0));
-    analogWrite(MOTOR_LEFT_R,  duty_cycle_to_byte(motor_duty_cycle));
-    analogWrite(MOTOR_RIGHT_F, duty_cycle_to_byte(motor_duty_cycle));
-    analogWrite(MOTOR_RIGHT_R, duty_cycle_to_byte(0));    
-    delay(PIVOT_TIME);
+    pivot_ccw(PIVOT_TIME_90);
     set_state(STATE_PIVOT_CW);
   }
   if (current_state == STATE_TURN_CW)
@@ -138,6 +131,24 @@ void stop_motor()
   analogWrite(MOTOR_LEFT_R,  duty_cycle_to_byte(0));
   analogWrite(MOTOR_RIGHT_F, duty_cycle_to_byte(0));
   analogWrite(MOTOR_RIGHT_R, duty_cycle_to_byte(0));  
+}
+
+void pivot_cw(int pivot_time)
+{
+    analogWrite(MOTOR_LEFT_F,  duty_cycle_to_byte(motor_duty_cycle));
+    analogWrite(MOTOR_LEFT_R,  duty_cycle_to_byte(0));
+    analogWrite(MOTOR_RIGHT_F, duty_cycle_to_byte(0));
+    analogWrite(MOTOR_RIGHT_R, duty_cycle_to_byte(motor_duty_cycle));    
+    delay(pivot_time);
+}
+
+void pivot_ccw(int pivot_time)
+{
+    analogWrite(MOTOR_LEFT_F,  duty_cycle_to_byte(0));
+    analogWrite(MOTOR_LEFT_R,  duty_cycle_to_byte(motor_duty_cycle));
+    analogWrite(MOTOR_RIGHT_F, duty_cycle_to_byte(motor_duty_cycle));
+    analogWrite(MOTOR_RIGHT_R, duty_cycle_to_byte(0));    
+    delay(pivot_time);
 }
 
 
