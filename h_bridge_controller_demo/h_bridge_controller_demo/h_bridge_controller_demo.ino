@@ -71,7 +71,7 @@ void loop() {
     analogWrite(MOTOR_LEFT_R,  duty_cycle_to_byte(0));
     analogWrite(MOTOR_RIGHT_F, duty_cycle_to_byte(motor_duty_cycle));
     analogWrite(MOTOR_RIGHT_R, duty_cycle_to_byte(0));
-    delay(1000);
+    delay(5000);
     set_state(STATE_REVERSE);
   }
   
@@ -81,8 +81,8 @@ void loop() {
     analogWrite(MOTOR_LEFT_R,  duty_cycle_to_byte(motor_duty_cycle));
     analogWrite(MOTOR_RIGHT_F, duty_cycle_to_byte(0));
     analogWrite(MOTOR_RIGHT_R, duty_cycle_to_byte(motor_duty_cycle));
-    delay(1000);
-    set_state(STATE_TURN_CCW);
+    delay(5000);
+    set_state(STATE_STOPPED);
   }  
   
   if (current_state == STATE_PIVOT_CW)

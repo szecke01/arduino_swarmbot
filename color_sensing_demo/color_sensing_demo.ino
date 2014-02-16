@@ -3,7 +3,7 @@
 const int RED_LED_PIN = 15;
 const int BLUE_LED_PIN = 14;
 const int SENSOR_PIN = 0;
-
+boolean output = HIGH;
 void setup() {
   Serial.begin(9600);
   
@@ -20,7 +20,7 @@ void loop() {
 }
 
 void flash() {
-  static boolean output = HIGH;
+  
 
   digitalWrite(BLUE_LED_PIN, output);
   digitalWrite(RED_LED_PIN, !output);
