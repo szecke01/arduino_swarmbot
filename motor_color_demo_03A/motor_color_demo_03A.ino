@@ -14,7 +14,6 @@
   - Change color_diff to buffer for average
     * this prevents noise from triggering unwanted state-changes
   - Separate 9 and 6 V power supplies
-  - Check the motor (why is it sticking??)
 */
 
 // Motor Control Pins
@@ -42,14 +41,15 @@ const int PIVOT_TIME_60 = 420;
 const int RED_LED_PIN = 15;
 const int BLUE_LED_PIN = 14;
 const int COLOR_SENSOR_PIN = 0;
-const int LED_FLASH_PERIOD = 50000000;
+const int LED_FLASH_PERIOD = 41000000;
 const int MIN_DIFF_THRESHOLD = 20;
 
 // Color sensor variables
 boolean color_sensor_output = LOW;
-int last_red   = -1;
-int last_blue  = -1;
-int color_diff = 0;
+int last_red     = -1;
+int last_blue    = -1;
+int color_diff   = 0;
+int calib_offset = 0; 
 
 // Current arduino state
 int current_state;
@@ -61,6 +61,20 @@ void setup() {
   Serial.begin(9600);
   pinMode(RED_LED_PIN, OUTPUT);
   pinMode(BLUE_LED_PIN, OUTPUT);
+  
+  // Calibrate lights
+  delay(500);
+  int calib_iter  = 4;
+  int temp_offset = 0;
+  for(int i = 0; i < calib_iter; i++)
+  {
+    delay(250);
+    flash();
+    delay(250);
+    flash();
+    temp_offset = color_diff;
+  }
+  calib_offset = temp_offset;
   Timer1.initialize(500000);
   Timer1.attachInterrupt(flash, LED_FLASH_PERIOD);
   
@@ -71,7 +85,7 @@ void setup() {
   pinMode(MOTOR_RIGHT_R, OUTPUT);
   
   // Initialize state machine to desired initial state
-  set_state(STATE_FORWARD);
+  set_state(STATE_STOPPED);
   motor_duty_cycle = .5;  
   
   //pinMode(motor_enable, INPUT_PULLUP);
@@ -80,13 +94,10 @@ void setup() {
 
 void loop() {
   
-  // Use color info to set state
-  if(color_diff > MIN_DIFF_THRESHOLD)
-    Serial.println("We are on red paper! :)");
-  if(color_diff < -1*MIN_DIFF_THRESHOLD)
+  // If blue!
+  if(color_diff < -1*(MIN_DIFF_THRESHOLD))
     {
       set_state(STATE_STOPPED);
-      Serial.println("We are on blue paper! :)");
     }
   
   // Iterate through FSM and perform current state
@@ -201,12 +212,13 @@ void flash() {
   digitalWrite(BLUE_LED_PIN, color_sensor_output);
   digitalWrite(RED_LED_PIN, !color_sensor_output);
   
-  if(!color_sensor_output) last_red = analogRead(COLOR_SENSOR_PIN);
+  if(color_sensor_output) last_red = analogRead(COLOR_SENSOR_PIN);
   else last_blue = analogRead(COLOR_SENSOR_PIN);
   
   if (last_blue > 0 && last_red > 0)
   {
-    color_diff = last_blue - last_red;
+    color_diff = (last_blue - last_red)- calib_offset;
+
   }
   
 }

@@ -25,26 +25,27 @@ void loop() {
   // put your main code here, to run repeatedly:
   
   int light_intensity = analogRead(SENSOR_PIN);
-  
-  if(color_diff > MIN_DIFF_THRESHOLD)
-    Serial.println("We are on red paper! :)");
-  if(color_diff < -1*MIN_DIFF_THRESHOLD)
-    Serial.println("We are on blue paper! :)");
+ 
 
 }
 
 void flash() {
+  
   output = !output;
   digitalWrite(BLUE_LED_PIN, output);
-  digitalWrite(RED_LED_PIN, !output);
+ // digitalWrite(RED_LED_PIN, !output);
+  if(!output)
+  last_blue = analogRead(SENSOR_PIN);
   
-  if(!output) last_red = analogRead(SENSOR_PIN);
-  else last_blue = analogRead(SENSOR_PIN);
-  
+  //Serial.print("The red_value is: ");
+  //Serial.println(last_red);
+  Serial.print("The blue_value is: ");
+  Serial.println(last_blue);
   if (last_blue > 0 && last_red > 0)
   {
     color_diff = last_blue - last_red;
   }
+  
   
 }
 
