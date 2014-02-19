@@ -16,6 +16,9 @@
   - Separate 9 and 6 V power supplies
 */
 
+const int PIN_GREEN_LED = 53;
+const int PIN_YELLO_LED = 52;
+
 // Motor Control Pins
 const int MOTOR_LEFT_F  = 4;  
 const int MOTOR_LEFT_R  = 2;
@@ -64,7 +67,7 @@ void setup() {
   
   // Calibrate lights
   delay(500);
-  int calib_iter  = 4;
+  int calib_iter  = 2;
   int temp_offset = 0;
   for(int i = 0; i < calib_iter; i++)
   {
@@ -75,14 +78,18 @@ void setup() {
     temp_offset = color_diff;
   }
   calib_offset = temp_offset;
-  Timer1.initialize(500000);
-  Timer1.attachInterrupt(flash, LED_FLASH_PERIOD);
+  Timer1.initialize(50000);
+  Timer1.attachInterrupt(flash);
   
   // Establish H-Bridge inputs as outputs from arduino
   pinMode(MOTOR_LEFT_F,  OUTPUT);
   pinMode(MOTOR_LEFT_R,  OUTPUT);
   pinMode(MOTOR_RIGHT_F, OUTPUT);
   pinMode(MOTOR_RIGHT_R, OUTPUT);
+  
+  // GREEN/YELLO indicator LEDs
+  pinMode(PIN_GREEN_LED, OUTPUT);
+  pinMode(PIN_YELLO_LED, OUTPUT);
   
   // Initialize state machine to desired initial state
   set_state(STATE_STOPPED);
@@ -94,10 +101,21 @@ void setup() {
 
 void loop() {
   
-  // If blue!
+  // If RED!
   if(color_diff < -1*(MIN_DIFF_THRESHOLD))
     {
-      set_state(STATE_STOPPED);
+      digitalWrite(PIN_GREEN_LED, HIGH);
+      digitalWrite(PIN_YELLO_LED, LOW);
+    }
+  // if BLUE!
+  else if(color_diff > 1*(MIN_DIFF_THRESHOLD))
+    {
+      digitalWrite(PIN_GREEN_LED, LOW);
+      digitalWrite(PIN_YELLO_LED, HIGH);
+    }
+  else{
+      digitalWrite(PIN_GREEN_LED, LOW);
+      digitalWrite(PIN_YELLO_LED, LOW);
     }
   
   // Iterate through FSM and perform current state
@@ -109,7 +127,7 @@ void loop() {
     analogWrite(MOTOR_LEFT_R,  duty_cycle_to_byte(0));
     analogWrite(MOTOR_RIGHT_F, duty_cycle_to_byte(0));
     analogWrite(MOTOR_RIGHT_R, duty_cycle_to_byte(0));
-    delay(1000);
+    //delay(1000);
     set_state(STATE_STOPPED);
   }
   
@@ -129,7 +147,7 @@ void loop() {
     analogWrite(MOTOR_LEFT_R,  duty_cycle_to_byte(motor_duty_cycle));
     analogWrite(MOTOR_RIGHT_F, duty_cycle_to_byte(0));
     analogWrite(MOTOR_RIGHT_R, duty_cycle_to_byte(motor_duty_cycle));
-    delay(5000);
+    //delay(5000);
     set_state(STATE_STOPPED);
   }  
   
@@ -150,7 +168,7 @@ void loop() {
     analogWrite(MOTOR_LEFT_R,  duty_cycle_to_byte(0));
     analogWrite(MOTOR_RIGHT_F, duty_cycle_to_byte(motor_duty_cycle));
     analogWrite(MOTOR_RIGHT_R, duty_cycle_to_byte(0));    
-    delay(1000);
+    //delay(1000);
     set_state(STATE_PIVOT_CCW);
   }
   if (current_state == STATE_TURN_CCW)
@@ -159,7 +177,7 @@ void loop() {
     analogWrite(MOTOR_LEFT_R,  duty_cycle_to_byte(0));
     analogWrite(MOTOR_RIGHT_F, duty_cycle_to_byte(motor_duty_cycle*TURN_SPEED_RATIO));
     analogWrite(MOTOR_RIGHT_R, duty_cycle_to_byte(0));    
-    delay(1000);
+    //delay(1000);
     set_state(STATE_TURN_CW);
   }
 }
@@ -168,7 +186,7 @@ void loop() {
 void set_state(int new_state)
 {
   stop_motor();
-  delay(STATE_CHANGE_DELAY);
+  //delay(STATE_CHANGE_DELAY);
   current_state = new_state;
 }
 
@@ -187,7 +205,7 @@ void pivot_cw(int pivot_time)
     analogWrite(MOTOR_LEFT_R,  duty_cycle_to_byte(0));
     analogWrite(MOTOR_RIGHT_F, duty_cycle_to_byte(0));
     analogWrite(MOTOR_RIGHT_R, duty_cycle_to_byte(motor_duty_cycle));    
-    delay(pivot_time);
+    //delay(pivot_time);
 }
 
 void pivot_ccw(int pivot_time)
@@ -196,7 +214,7 @@ void pivot_ccw(int pivot_time)
     analogWrite(MOTOR_LEFT_R,  duty_cycle_to_byte(motor_duty_cycle));
     analogWrite(MOTOR_RIGHT_F, duty_cycle_to_byte(motor_duty_cycle));
     analogWrite(MOTOR_RIGHT_R, duty_cycle_to_byte(0));    
-    delay(pivot_time);
+    //delay(pivot_time);
 }
 
 
@@ -208,17 +226,23 @@ byte duty_cycle_to_byte(float duty)
 }
 
 void flash() {
+  
+  // Toggle between red/blue
   color_sensor_output = !color_sensor_output;
   digitalWrite(BLUE_LED_PIN, color_sensor_output);
   digitalWrite(RED_LED_PIN, !color_sensor_output);
   
-  if(color_sensor_output) last_red = analogRead(COLOR_SENSOR_PIN);
+  // allow analog read to sense recently switched-on LED
+  delay(250);
+  
+  // Set most recent red/blue 
+  if(!color_sensor_output) last_red = analogRead(COLOR_SENSOR_PIN);
   else last_blue = analogRead(COLOR_SENSOR_PIN);
   
+  // Sets the color difference if we have values in the buffer for both
   if (last_blue > 0 && last_red > 0)
   {
     color_diff = (last_blue - last_red)- calib_offset;
-
   }
   
 }
