@@ -20,10 +20,10 @@ const int PIN_GREEN_LED = 53;
 const int PIN_YELLO_LED = 52;
 
 // Motor Control Pins
-const int MOTOR_LEFT_F  = 4;  
-const int MOTOR_LEFT_R  = 2;
-const int MOTOR_RIGHT_F = 5;
-const int MOTOR_RIGHT_R = 3;
+const int MOTOR_LEFT_F  = 2;  
+const int MOTOR_LEFT_R  = 4;
+const int MOTOR_RIGHT_F = 3;
+const int MOTOR_RIGHT_R = 5;
 
 // State values
 const int STATE_STOPPED    = 0;
@@ -92,30 +92,26 @@ void setup() {
   pinMode(PIN_YELLO_LED, OUTPUT);
   
   // Initialize state machine to desired initial state
-  set_state(STATE_STOPPED);
+  set_state(STATE_FORWARD);
   motor_duty_cycle = .5;  
-  
-  //pinMode(motor_enable, INPUT_PULLUP);
-  //digitalWrite(motor_pin, LOW);
+ 
 }
 
 void loop() {
   
   // If RED!
-  if(color_diff < -1*(MIN_DIFF_THRESHOLD))
+  if(color_diff < -1*(MIN_DIFF_THRESHOLD) && current_state == STATE_FORWARD)
     {
       digitalWrite(PIN_GREEN_LED, HIGH);
       digitalWrite(PIN_YELLO_LED, LOW);
+      set_state(STATE_STOPPED);
     }
   // if BLUE!
-  else if(color_diff > 1*(MIN_DIFF_THRESHOLD))
+  else if(color_diff > 1*(MIN_DIFF_THRESHOLD) && current_state == STATE_STOPPED)
     {
       digitalWrite(PIN_GREEN_LED, LOW);
       digitalWrite(PIN_YELLO_LED, HIGH);
-    }
-  else{
-      digitalWrite(PIN_GREEN_LED, LOW);
-      digitalWrite(PIN_YELLO_LED, LOW);
+      set_state(STATE_FORWARD);
     }
   
   // Iterate through FSM and perform current state
@@ -127,8 +123,6 @@ void loop() {
     analogWrite(MOTOR_LEFT_R,  duty_cycle_to_byte(0));
     analogWrite(MOTOR_RIGHT_F, duty_cycle_to_byte(0));
     analogWrite(MOTOR_RIGHT_R, duty_cycle_to_byte(0));
-    //delay(1000);
-    set_state(STATE_STOPPED);
   }
   
   if (current_state == STATE_FORWARD)
@@ -137,8 +131,6 @@ void loop() {
     analogWrite(MOTOR_LEFT_R,  duty_cycle_to_byte(0));
     analogWrite(MOTOR_RIGHT_F, duty_cycle_to_byte(motor_duty_cycle));
     analogWrite(MOTOR_RIGHT_R, duty_cycle_to_byte(0));
-    //delay(5000);
-    //set_state(STATE_REVERSE);
   }
   
   if (current_state == STATE_REVERSE)
@@ -147,8 +139,6 @@ void loop() {
     analogWrite(MOTOR_LEFT_R,  duty_cycle_to_byte(motor_duty_cycle));
     analogWrite(MOTOR_RIGHT_F, duty_cycle_to_byte(0));
     analogWrite(MOTOR_RIGHT_R, duty_cycle_to_byte(motor_duty_cycle));
-    //delay(5000);
-    set_state(STATE_STOPPED);
   }  
   
   if (current_state == STATE_PIVOT_CW)
@@ -168,8 +158,6 @@ void loop() {
     analogWrite(MOTOR_LEFT_R,  duty_cycle_to_byte(0));
     analogWrite(MOTOR_RIGHT_F, duty_cycle_to_byte(motor_duty_cycle));
     analogWrite(MOTOR_RIGHT_R, duty_cycle_to_byte(0));    
-    //delay(1000);
-    set_state(STATE_PIVOT_CCW);
   }
   if (current_state == STATE_TURN_CCW)
   {
@@ -177,8 +165,6 @@ void loop() {
     analogWrite(MOTOR_LEFT_R,  duty_cycle_to_byte(0));
     analogWrite(MOTOR_RIGHT_F, duty_cycle_to_byte(motor_duty_cycle*TURN_SPEED_RATIO));
     analogWrite(MOTOR_RIGHT_R, duty_cycle_to_byte(0));    
-    //delay(1000);
-    set_state(STATE_TURN_CW);
   }
 }
 
@@ -186,7 +172,7 @@ void loop() {
 void set_state(int new_state)
 {
   stop_motor();
-  //delay(STATE_CHANGE_DELAY);
+  delay(STATE_CHANGE_DELAY);
   current_state = new_state;
 }
 
@@ -243,6 +229,8 @@ void flash() {
   if (last_blue > 0 && last_red > 0)
   {
     color_diff = (last_blue - last_red)- calib_offset;
+    Serial.print("Color diff is: ");
+    Serial.println(color_diff);
   }
   
 }
