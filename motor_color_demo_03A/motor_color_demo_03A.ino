@@ -33,10 +33,11 @@ const int STATE_PIVOT_CCW  = 3;
 const int STATE_PIVOT_CW   = 4;
 const int STATE_TURN_CCW   = 5;
 const int STATE_TURN_CW    = 6;
+const int STATE_SEARCHING  = 7;
 
 // Motor Constants
 const float TURN_SPEED_RATIO = .25;
-const int STATE_CHANGE_DELAY = 2000;
+const int STATE_CHANGE_DELAY = 200;
 const int PIVOT_TIME_90 = 630;
 const int PIVOT_TIME_60 = 420;
 
@@ -46,6 +47,10 @@ const int BLUE_LED_PIN = 14;
 const int COLOR_SENSOR_PIN = 0;
 const int LED_FLASH_PERIOD = 41000000;
 const int MIN_DIFF_THRESHOLD = 20;
+const int COLOR_SENSE_BUFFER_SIZE = 2;
+const int RED_COLOR  = -1;
+const int BLUE_COLOR = 1;
+const int NEUTRAL_COLOR = 0;
 
 // Color sensor variables
 boolean color_sensor_output = LOW;
@@ -53,6 +58,11 @@ int last_red     = -1;
 int last_blue    = -1;
 int color_diff   = 0;
 int calib_offset = 0; 
+int color_sense_buffer[COLOR_SENSE_BUFFER_SIZE];
+int color_sense_buffer_index = 0;
+
+// Searching algorithm paramters
+long last_search_time = 0;
 
 // Current arduino state
 int current_state;
@@ -66,6 +76,10 @@ void setup() {
   pinMode(BLUE_LED_PIN, OUTPUT);
   
   // Calibrate lights
+  for(int i = 0; i < COLOR_SENSE_BUFFER_SIZE; ++i)
+  {
+     color_sense_buffer[i] = 0;
+  }
   delay(500);
   int calib_iter  = 2;
   int temp_offset = 0;
@@ -92,37 +106,62 @@ void setup() {
   pinMode(PIN_YELLO_LED, OUTPUT);
   
   // Initialize state machine to desired initial state
-  set_state(STATE_FORWARD);
-  motor_duty_cycle = .5;  
- 
+  set_state(STATE_STOPPED);
+  motor_duty_cycle = .18;  
+  
+  // Searching parameters
+  
 }
 
 void loop() {
   
   // If RED!
-  if(color_diff < -1*(MIN_DIFF_THRESHOLD) && current_state == STATE_FORWARD)
+  int c_color = calculate_color();
+  Serial.print("The time diff is: ");
+  Serial.println(millis() - last_search_time);
+  
+  // if BLUE OR RED
+  if((c_color == BLUE_COLOR)
+          && current_state != STATE_FORWARD)
     {
-      digitalWrite(PIN_GREEN_LED, HIGH);
-      digitalWrite(PIN_YELLO_LED, LOW);
-      set_state(STATE_STOPPED);
-    }
-  // if BLUE!
-  else if(color_diff > 1*(MIN_DIFF_THRESHOLD) && current_state == STATE_STOPPED)
-    {
-      digitalWrite(PIN_GREEN_LED, LOW);
-      digitalWrite(PIN_YELLO_LED, HIGH);
       set_state(STATE_FORWARD);
     }
+  else if((c_color == RED_COLOR))
+   {
+     set_state(STATE_STOPPED);
+   }
+  else if(c_color == NEUTRAL_COLOR && current_state != STATE_SEARCHING)
+  {
+    set_state(STATE_SEARCHING);
+  }
   
-  // Iterate through FSM and perform current state
+  // Performs state actions
+  handle_state();
+ 
+}
+
+// Sets state and gives delay
+void set_state(int new_state)
+{
+  // prevent shoot-through, set state
+  delay(STATE_CHANGE_DELAY);
+  stop_motor();
+  current_state = new_state;
+  
+  // state specific event_handling
+  if(current_state == STATE_SEARCHING)
+    last_search_time = millis();
+  
+}
+
+void handle_state()
+{
+    // Iterate through FSM and perform current state
   // Not using else-if's in case interrupt causes 
   // state changes
   if (current_state == STATE_STOPPED)
   {
-    analogWrite(MOTOR_LEFT_F,  duty_cycle_to_byte(0));
-    analogWrite(MOTOR_LEFT_R,  duty_cycle_to_byte(0));
-    analogWrite(MOTOR_RIGHT_F, duty_cycle_to_byte(0));
-    analogWrite(MOTOR_RIGHT_R, duty_cycle_to_byte(0));
+    stop_motor();
   }
   
   if (current_state == STATE_FORWARD)
@@ -143,14 +182,18 @@ void loop() {
   
   if (current_state == STATE_PIVOT_CW)
   {
-    pivot_cw(PIVOT_TIME_60);
-    set_state(STATE_STOPPED); 
+    analogWrite(MOTOR_LEFT_F,  duty_cycle_to_byte(motor_duty_cycle));
+    analogWrite(MOTOR_LEFT_R,  duty_cycle_to_byte(0));
+    analogWrite(MOTOR_RIGHT_F, duty_cycle_to_byte(0));
+    analogWrite(MOTOR_RIGHT_R, duty_cycle_to_byte(motor_duty_cycle)); 
   }
   
   if (current_state == STATE_PIVOT_CCW)
   {
-    pivot_ccw(PIVOT_TIME_90);
-    set_state(STATE_PIVOT_CW);
+    analogWrite(MOTOR_LEFT_F,  duty_cycle_to_byte(0));
+    analogWrite(MOTOR_LEFT_R,  duty_cycle_to_byte(motor_duty_cycle));
+    analogWrite(MOTOR_RIGHT_F, duty_cycle_to_byte(motor_duty_cycle));
+    analogWrite(MOTOR_RIGHT_R, duty_cycle_to_byte(0)); 
   }
   if (current_state == STATE_TURN_CW)
   {
@@ -166,14 +209,41 @@ void loop() {
     analogWrite(MOTOR_RIGHT_F, duty_cycle_to_byte(motor_duty_cycle*TURN_SPEED_RATIO));
     analogWrite(MOTOR_RIGHT_R, duty_cycle_to_byte(0));    
   }
-}
+  if (current_state == STATE_SEARCHING)
+  {
+    
+    if(millis() - last_search_time < 600)
+    {
+      // Turn clockwise
+      analogWrite(MOTOR_LEFT_F,  duty_cycle_to_byte(motor_duty_cycle));
+      analogWrite(MOTOR_LEFT_R,  duty_cycle_to_byte(0));
+      analogWrite(MOTOR_RIGHT_F, duty_cycle_to_byte(0));
+      analogWrite(MOTOR_RIGHT_R, duty_cycle_to_byte(motor_duty_cycle)); 
+    }
+    else if(millis() - last_search_time < 650)
+      stop_motor();
+    else if(millis() - last_search_time < 1850)
+    {
+      // Turn counter-clockwise
+      analogWrite(MOTOR_LEFT_F,  duty_cycle_to_byte(0));
+      analogWrite(MOTOR_LEFT_R,  duty_cycle_to_byte(motor_duty_cycle));
+      analogWrite(MOTOR_RIGHT_F, duty_cycle_to_byte(motor_duty_cycle));
+      analogWrite(MOTOR_RIGHT_R, duty_cycle_to_byte(0)); 
+    }
+    else if(millis() - last_search_time < 2250)
+    {
+       // Turn clockwise again
+      analogWrite(MOTOR_LEFT_F,  duty_cycle_to_byte(motor_duty_cycle));
+      analogWrite(MOTOR_LEFT_R,  duty_cycle_to_byte(0));
+      analogWrite(MOTOR_RIGHT_F, duty_cycle_to_byte(0));
+      analogWrite(MOTOR_RIGHT_R, duty_cycle_to_byte(motor_duty_cycle)); 
 
-// Sets state and gives delay
-void set_state(int new_state)
-{
-  stop_motor();
-  delay(STATE_CHANGE_DELAY);
-  current_state = new_state;
+    }
+    else if(millis() - last_search_time < 2300)
+      stop_motor();
+    else
+      last_search_time = millis();
+  }
 }
 
 // Sets analog out for motor to zero
@@ -185,25 +255,6 @@ void stop_motor()
   analogWrite(MOTOR_RIGHT_R, duty_cycle_to_byte(0));  
 }
 
-void pivot_cw(int pivot_time)
-{
-    analogWrite(MOTOR_LEFT_F,  duty_cycle_to_byte(motor_duty_cycle));
-    analogWrite(MOTOR_LEFT_R,  duty_cycle_to_byte(0));
-    analogWrite(MOTOR_RIGHT_F, duty_cycle_to_byte(0));
-    analogWrite(MOTOR_RIGHT_R, duty_cycle_to_byte(motor_duty_cycle));    
-    //delay(pivot_time);
-}
-
-void pivot_ccw(int pivot_time)
-{
-    analogWrite(MOTOR_LEFT_F,  duty_cycle_to_byte(0));
-    analogWrite(MOTOR_LEFT_R,  duty_cycle_to_byte(motor_duty_cycle));
-    analogWrite(MOTOR_RIGHT_F, duty_cycle_to_byte(motor_duty_cycle));
-    analogWrite(MOTOR_RIGHT_R, duty_cycle_to_byte(0));    
-    //delay(pivot_time);
-}
-
-
 // Converts duty cycle in decimal (between 0 & 1)
 // to byte for analog read
 byte duty_cycle_to_byte(float duty)
@@ -213,25 +264,61 @@ byte duty_cycle_to_byte(float duty)
 
 void flash() {
   
+   // Set most recent red/blue 
+  if(!color_sensor_output) last_red = analogRead(COLOR_SENSOR_PIN);
+  else last_blue = analogRead(COLOR_SENSOR_PIN);
+  
   // Toggle between red/blue
   color_sensor_output = !color_sensor_output;
   digitalWrite(BLUE_LED_PIN, color_sensor_output);
   digitalWrite(RED_LED_PIN, !color_sensor_output);
   
-  // allow analog read to sense recently switched-on LED
-  delay(250);
-  
-  // Set most recent red/blue 
-  if(!color_sensor_output) last_red = analogRead(COLOR_SENSOR_PIN);
-  else last_blue = analogRead(COLOR_SENSOR_PIN);
-  
   // Sets the color difference if we have values in the buffer for both
   if (last_blue > 0 && last_red > 0)
   {
     color_diff = (last_blue - last_red)- calib_offset;
-    Serial.print("Color diff is: ");
-    Serial.println(color_diff);
+    color_sense_buffer[color_sense_buffer_index] = color_diff;
+    color_sense_buffer_index = 
+      (color_sense_buffer_index + 1) % COLOR_SENSE_BUFFER_SIZE;
+      
   }
+}
+
+int calculate_color()
+{
+  int i;
+  int num_red = 0;
+  int num_blue = 0;
+  
+  // Iterate through buffer, calculate number of red/blue readings
+  for(i = 0; i < COLOR_SENSE_BUFFER_SIZE; i++)
+  {
+    
+    if(color_sense_buffer[i] < -1*(MIN_DIFF_THRESHOLD))
+    {
+      ++num_red;
+    }
+    
+    else if(color_sense_buffer[i] > MIN_DIFF_THRESHOLD)
+    {
+      ++num_blue;
+    }
+  }
+  
+  // return 1 if blue
+  if(num_blue > (int)(.8*(float)COLOR_SENSE_BUFFER_SIZE))
+  {
+    return 1;
+  }
+  
+  // return -1 if red
+  if(num_red > (int)(.8*(float)COLOR_SENSE_BUFFER_SIZE))
+  {
+    return -1;
+  }
+  
+  // return 0 if neutral
+  return 0;
   
 }
 
