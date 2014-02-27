@@ -23,7 +23,7 @@ const int PIN_YELLO_LED = 52;
 const int MOTOR_LEFT_F  = 2;  
 const int MOTOR_LEFT_R  = 4;
 const int MOTOR_RIGHT_F = 3;
-const int MOTOR_RIGHT_R = 5;
+const int MOTOR_RIGHT_R = 6; // comm PWM outputs on pin 5
 
 // State values
 const int STATE_STOPPED    = 0;
@@ -117,8 +117,8 @@ void loop() {
   
   // If RED!
   int c_color = calculate_color();
-  Serial.print("The time diff is: ");
-  Serial.println(millis() - last_search_time);
+  //Serial.print("The time diff is: ");
+  //Serial.println(millis() - last_search_time);
   
   // if BLUE OR RED
   if((c_color == BLUE_COLOR)
@@ -137,6 +137,9 @@ void loop() {
   
   // Performs state actions
   handle_state();
+  
+  Serial.println("left motor: ");
+  Serial.println(MOTOR_RIGHT_R);
  
 }
 
