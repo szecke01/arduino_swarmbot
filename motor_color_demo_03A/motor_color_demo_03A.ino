@@ -11,13 +11,8 @@
   ***********************/
 
 /* TODO:
-  - Change color_diff to buffer for average
-    * this prevents noise from triggering unwanted state-changes
-  - Separate 9 and 6 V power supplies
+  - Define communication protocol
 */
-
-const int PIN_GREEN_LED = 53;
-const int PIN_YELLO_LED = 52;
 
 // Motor Control Pins
 const int MOTOR_LEFT_F  = 2;  
@@ -70,44 +65,20 @@ float motor_duty_cycle;
 
 void setup() {
   
-  // Establish color params
+  // Serial (for debugging)
   Serial.begin(9600);
-  pinMode(RED_LED_PIN, OUTPUT);
-  pinMode(BLUE_LED_PIN, OUTPUT);
   
-  // Calibrate lights
-  for(int i = 0; i < COLOR_SENSE_BUFFER_SIZE; ++i)
-  {
-     color_sense_buffer[i] = 0;
-  }
-  delay(500);
-  int calib_iter  = 2;
-  int temp_offset = 0;
-  for(int i = 0; i < calib_iter; i++)
-  {
-    delay(250);
-    flash();
-    delay(250);
-    flash();
-    temp_offset = color_diff;
-  }
-  calib_offset = temp_offset;
-  Timer1.initialize(50000);
-  Timer1.attachInterrupt(flash);
+  // Initialize Timer
+  Timer1.initialize();
+  
+  // Initialize and calibrate color sensor
+  init_color_sensor();
   
   // Establish H-Bridge inputs as outputs from arduino
-  pinMode(MOTOR_LEFT_F,  OUTPUT);
-  pinMode(MOTOR_LEFT_R,  OUTPUT);
-  pinMode(MOTOR_RIGHT_F, OUTPUT);
-  pinMode(MOTOR_RIGHT_R, OUTPUT);
-  
-  // GREEN/YELLO indicator LEDs
-  pinMode(PIN_GREEN_LED, OUTPUT);
-  pinMode(PIN_YELLO_LED, OUTPUT);
+  init_motor_control();
   
   // Initialize state machine to desired initial state
   set_state(STATE_STOPPED);
-  motor_duty_cycle = .18;  
   
   // Searching parameters
   
@@ -121,8 +92,7 @@ void loop() {
   //Serial.println(millis() - last_search_time);
   
   // if BLUE OR RED
-  if((c_color == BLUE_COLOR)
-          && current_state != STATE_FORWARD)
+  if((c_color == BLUE_COLOR) && current_state != STATE_FORWARD)
     {
       set_state(STATE_FORWARD);
     }
@@ -292,36 +262,70 @@ int calculate_color()
   int i;
   int num_red = 0;
   int num_blue = 0;
-  
   // Iterate through buffer, calculate number of red/blue readings
   for(i = 0; i < COLOR_SENSE_BUFFER_SIZE; i++)
   {
-    
     if(color_sense_buffer[i] < -1*(MIN_DIFF_THRESHOLD))
     {
       ++num_red;
-    }
-    
+    } 
     else if(color_sense_buffer[i] > MIN_DIFF_THRESHOLD)
     {
       ++num_blue;
     }
   }
-  
   // return 1 if blue
   if(num_blue > (int)(.8*(float)COLOR_SENSE_BUFFER_SIZE))
   {
     return 1;
   }
-  
   // return -1 if red
   if(num_red > (int)(.8*(float)COLOR_SENSE_BUFFER_SIZE))
   {
     return -1;
   }
-  
   // return 0 if neutral
   return 0;
-  
 }
+
+void init_color_sensor()
+{
+   // Establish color params
+  Serial.begin(9600);
+  pinMode(RED_LED_PIN, OUTPUT);
+  pinMode(BLUE_LED_PIN, OUTPUT);
+  
+  // Calibrate lights
+  for(int i = 0; i < COLOR_SENSE_BUFFER_SIZE; ++i)
+  {
+     color_sense_buffer[i] = 0;
+  }
+  delay(500);
+  int calib_iter  = 2;
+  int temp_offset = 0;
+  for(int i = 0; i < calib_iter; i++)
+  {
+    delay(250);
+    flash();
+    delay(250);
+    flash();
+    temp_offset = color_diff;
+  }
+  calib_offset = temp_offset;
+  Timer1.attachInterrupt(flash, 50000);
+}
+
+void init_motor_control()
+{
+  // Assign motor to proper pins
+  pinMode(MOTOR_LEFT_F,  OUTPUT);
+  pinMode(MOTOR_LEFT_R,  OUTPUT);
+  pinMode(MOTOR_RIGHT_F, OUTPUT);
+  pinMode(MOTOR_RIGHT_R, OUTPUT);
+  
+  // Set duty cycle to desired speed
+  motor_duty_cycle = .18;  
+}
+
+
 
