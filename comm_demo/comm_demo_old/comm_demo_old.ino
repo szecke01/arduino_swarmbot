@@ -15,14 +15,14 @@ void setup(){
   TCCR3B = _BV(WGM32) | _BV(WGM33) | _BV(CS31);
   // sets WGM as stated above; sets clock scaling to "divide by 8"
   
-  OCR3A = 50;
+  OCR3A = 51;
   // above sets the counter value at which register resets to 0x0000;
   // generate 20kHz when OCR3A=50
   Serial.println(TCCR3A, BIN);Serial.println(TCCR3B, BIN);
 }
 void loop(){
   digitalWrite(MOD, HIGH);
-  delay(1000);
+  delayMicroseconds(800);
   digitalWrite(MOD, LOW);
-  delay(1000);
+  delayMicroseconds(800);
 }

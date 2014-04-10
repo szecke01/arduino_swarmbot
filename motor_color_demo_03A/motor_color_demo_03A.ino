@@ -15,8 +15,8 @@
 */
 
 // Motor Control Pins
-const int MOTOR_LEFT_F  = 2;  
-const int MOTOR_LEFT_R  = 4;
+const int MOTOR_LEFT_F  = 4;  
+const int MOTOR_LEFT_R  = 2;
 const int MOTOR_RIGHT_F = 3;
 const int MOTOR_RIGHT_R = 6; // comm PWM outputs on pin 5
 
@@ -107,9 +107,6 @@ void loop() {
   
   // Performs state actions
   handle_state();
-  
-  Serial.println("left motor: ");
-  Serial.println(MOTOR_RIGHT_R);
  
 }
 
@@ -117,8 +114,8 @@ void loop() {
 void set_state(int new_state)
 {
   // prevent shoot-through, set state
-  delay(STATE_CHANGE_DELAY);
   stop_motor();
+  delay(STATE_CHANGE_DELAY);
   current_state = new_state;
   
   // state specific event_handling

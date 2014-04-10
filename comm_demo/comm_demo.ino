@@ -15,10 +15,10 @@
 */
 
 // Motor Control Pins
-const int MOTOR_LEFT_F  = 2;  
-const int MOTOR_LEFT_R  = 4;
-const int MOTOR_RIGHT_F = 3;
-const int MOTOR_RIGHT_R = 6; // comm PWM outputs on pin 5
+const int MOTOR_LEFT_F  = 8;  
+const int MOTOR_LEFT_R  = 9;
+const int MOTOR_RIGHT_F = 10;
+const int MOTOR_RIGHT_R = 11; 
 
 // State values
 const int STATE_STOPPED    = 0;
@@ -49,6 +49,12 @@ const int RED_COLOR  = -1;
 const int BLUE_COLOR = 1;
 const int NEUTRAL_COLOR = 0;
 
+// Tx/Rx Constants
+const int CARRIER_PIN = 5;
+const int TX_PIN = 4;
+const int RX_PIN = 2;
+const int NUM_LISTENS = 5;
+
 // Color sensor variables
 boolean color_sensor_output = LOW;
 int last_red     = -1;
@@ -57,6 +63,23 @@ int color_diff   = 0;
 int calib_offset = 0; 
 int color_sense_buffer[COLOR_SENSE_BUFFER_SIZE];
 int color_sense_buffer_index = 0;
+
+// Tx/Rx variables
+// I FOUND RED:  {1,1,1,1,1,1,1,0,0,0}; 7 1's per 10 bits
+// I FOUND BLUE: {1,1,1,1,0,0,0,0,0,0}; 4 1's per 10 bits
+// I HEARD YOU:  {1,1,0,0,0,0,0,0,0,0}; 2 1's per 10 bits
+// Protocol is to listen to NUM_LISTENS sets of 10 bits
+// take average # of 1's and round it -- 
+// if 7: FOUND_RED
+// if 4: FOUND_BLUE
+// if 2: HEARD_YOU
+boolean tx_msg = {0,0,0,0,0,0,0,0,0,0}; 
+boolean rx_msg = {0,0,0,0,0,0,0,0,0,0};
+int FOUND_RED  = 0;
+int FOUND_BLUE = 1;
+int HEARD_YOU  = 2;
+int NUM_LISTENS = 5;
+String rx_str  = "";
 
 // Searching algorithm paramters
 long last_search_time = 0;
@@ -79,19 +102,20 @@ void setup() {
   // Establish H-Bridge inputs as outputs from arduino
   init_motor_control();
   
+  // Begin sending carrier signal to pin 5 and set the data pin low. 
+  init_tx_rx();
+  
   // Initialize state machine to desired initial state
   set_state(STATE_TX);
   
-  // Searching parameters
+ 
   
 }
 
 void loop() {
   
-  // If RED!
+  // Calculate the sensed color
   int c_color = calculate_color();
-  //Serial.print("The time diff is: ");
-  //Serial.println(millis() - last_search_time);
   
   // if BLUE OR RED
   if((c_color == BLUE_COLOR) && current_state == STATE_SEARCHING)
@@ -109,9 +133,6 @@ void loop() {
   
   // Performs state actions
   handle_state();
-  
-  Serial.println("left motor: ");
-  Serial.println(MOTOR_RIGHT_R);
  
 }
 
@@ -119,8 +140,8 @@ void loop() {
 void set_state(int new_state)
 {
   // prevent shoot-through, set state
-  delay(STATE_CHANGE_DELAY);
   stop_motor();
+  delay(STATE_CHANGE_DELAY);
   current_state = new_state;
   
   // state specific event_handling
@@ -131,7 +152,7 @@ void set_state(int new_state)
 
 void handle_state()
 {
-    // Iterate through FSM and perform current state
+  // Iterate through FSM and perform current state
   // Not using else-if's in case interrupt causes 
   // state changes
   if (current_state == STATE_STOPPED)
@@ -218,6 +239,14 @@ void handle_state()
       stop_motor();
     else
       last_search_time = millis();
+  }
+  if (current_state == STATE_TX)
+  {
+    
+  }
+  if (current_state == STATE_RX)
+  {
+    
   }
 }
 
@@ -331,5 +360,21 @@ void init_motor_control()
   motor_duty_cycle = .18;  
 }
 
+void init_tx_rx()
+{
+  pinMode(CARRIER_PIN, OUTPUT); 
+  pinMode(TX_PIN, OUTPUT);
+  pinMode(RX_PIN, INPUT);
+  digitalWrite(TX_PIN, LOW);
+
+  TCCR3A = _BV(COM3A0) | _BV(COM3B0) | _BV(WGM30) | _BV(WGM31);
+  // sets COM Output Mode to FastPWM with toggle of OC3A on compare match with OCR3A
+  // also sets WGM to mode 15: FastPWM with top set by OCR3A
+  
+  TCCR3B = _BV(WGM32) | _BV(WGM33) | _BV(CS31);
+  // sets WGM as stated above; sets clock scaling to "divide by 8"
+  
+  OCR3A = 51;
+}
 
 
