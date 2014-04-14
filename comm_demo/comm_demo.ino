@@ -15,10 +15,10 @@
 */
 
 // Motor Control Pins
-const int MOTOR_LEFT_F  = 8;  
-const int MOTOR_LEFT_R  = 9;
-const int MOTOR_RIGHT_F = 10;
-const int MOTOR_RIGHT_R = 11; 
+const int MOTOR_LEFT_F  = 4;  
+const int MOTOR_LEFT_R  = 2;
+const int MOTOR_RIGHT_F = 3;
+const int MOTOR_RIGHT_R = 6; 
 
 // State values
 const int STATE_STOPPED    = 0;
@@ -31,6 +31,7 @@ const int STATE_TURN_CW    = 6;
 const int STATE_SEARCHING  = 7;
 const int STATE_RX         = 8;
 const int STATE_TX         = 9; 
+const int STATE_COLLIDED   = 10;
 
 // Motor Constants
 const float TURN_SPEED_RATIO = .25;
@@ -54,6 +55,15 @@ const int CARRIER_PIN = 5;
 const int TX_PIN = 4;
 const int RX_PIN = 2;
 const int NUM_LISTENS = 5;
+const int FOUND_RED  = 0;
+const int FOUND_BLUE = 1;
+const int HEARD_YOU  = 2;
+
+// Collision Detector Constants
+const int COLLISION_INTERRUPT_PIN = 21;
+const int COLLISION_INTERRUPT_NO  = 2;
+const int COLLISION_SWITCH_PINS[] = {41,43,45,47,49,51};
+const int NUM_COLLISION_PINS = 6;
 
 // Color sensor variables
 boolean color_sensor_output = LOW;
@@ -73,16 +83,16 @@ int color_sense_buffer_index = 0;
 // if 7: FOUND_RED
 // if 4: FOUND_BLUE
 // if 2: HEARD_YOU
-boolean tx_msg = {0,0,0,0,0,0,0,0,0,0}; 
-boolean rx_msg = {0,0,0,0,0,0,0,0,0,0};
-int FOUND_RED  = 0;
-int FOUND_BLUE = 1;
-int HEARD_YOU  = 2;
-int NUM_LISTENS = 5;
+// 
+boolean tx_msg[] = {0,0,0,0,0,0,0,0,0,0}; 
+boolean rx_msg[] = {0,0,0,0,0,0,0,0,0,0};
 String rx_str  = "";
 
 // Searching algorithm paramters
 long last_search_time = 0;
+
+// Collision Detector parameters
+long last_collide_time = 0;
 
 // Current arduino state
 int current_state;
@@ -105,10 +115,12 @@ void setup() {
   // Begin sending carrier signal to pin 5 and set the data pin low. 
   init_tx_rx();
   
-  // Initialize state machine to desired initial state
-  set_state(STATE_TX);
+  // Initialize collision detector interrupts
+  init_collision_detector();
   
- 
+  // Initialize state machine to desired initial state
+  set_state(STATE_STOPPED);
+  
   
 }
 
@@ -117,6 +129,7 @@ void loop() {
   // Calculate the sensed color
   int c_color = calculate_color();
   
+
   // if BLUE OR RED
   if((c_color == BLUE_COLOR) && current_state == STATE_SEARCHING)
     {
@@ -248,6 +261,20 @@ void handle_state()
   {
     
   }
+  if (current_state == STATE_COLLIDED)
+  {
+    
+    analogWrite(MOTOR_LEFT_F,  duty_cycle_to_byte(0));
+    analogWrite(MOTOR_LEFT_R,  duty_cycle_to_byte(motor_duty_cycle));
+    analogWrite(MOTOR_RIGHT_F, duty_cycle_to_byte(motor_duty_cycle));
+    analogWrite(MOTOR_RIGHT_R, duty_cycle_to_byte(0));
+    
+    // Waits one second before accepting new collision interrupts
+    if(millis() - last_collide_time > 1000)
+    {
+      collision_refresh();
+    }
+  }
 }
 
 // Sets analog out for motor to zero
@@ -348,6 +375,36 @@ void init_color_sensor()
   Timer1.attachInterrupt(flash, 50000);
 }
 
+void handle_collision()
+{
+  
+ detachInterrupt(COLLISION_INTERRUPT_NO);
+ 
+    Serial.println("The bumpers detected are: {");
+    for(int i = 0; i < NUM_COLLISION_PINS; i++)
+    {
+      if(digitalRead(COLLISION_SWITCH_PINS[i]) == HIGH)
+      {
+        Serial.print(i);
+        Serial.print(" ");
+      }
+    }
+    Serial.print("}");
+    Serial.println("");
+ 
+ // timer begin
+ // when timer ends, call collision refresh
+ last_collide_time = millis();
+ set_state(STATE_COLLIDED);
+
+}
+
+void collision_refresh()
+{
+  set_state(STATE_STOPPED);
+  attachInterrupt(COLLISION_INTERRUPT_NO, handle_collision, RISING);
+}
+
 void init_motor_control()
 {
   // Assign motor to proper pins
@@ -377,4 +434,13 @@ void init_tx_rx()
   OCR3A = 51;
 }
 
+void init_collision_detector()
+{
+  
+  for(int i = 0; i < NUM_COLLISION_PINS; i++)
+    pinMode(COLLISION_SWITCH_PINS[i], INPUT_PULLUP);
+  
+  attachInterrupt(COLLISION_INTERRUPT_NO, handle_collision, RISING);
+  
+}
 
