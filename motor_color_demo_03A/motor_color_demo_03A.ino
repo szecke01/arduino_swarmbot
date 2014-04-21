@@ -89,35 +89,26 @@ void setup() {
   init_collision_detector();
   
   // Initialize state machine to desired initial state
-  set_state(STATE_STOPPED);
+  set_state(STATE_FORWARD);
   
   // Searching parameters
   
 }
 
 void loop() {
-  
+  /*
   // If RED!
   int c_color = calculate_color();
   //Serial.print("The time diff is: ");
   //Serial.println(millis() - last_search_time);
   
-  // if BLUE OR RED
-  if((c_color == BLUE_COLOR) && current_state != STATE_FORWARD)
-    {
-      set_state(STATE_FORWARD);
-    }
-  else if((c_color == RED_COLOR))
-   {
-     set_state(STATE_STOPPED);
-   }
-  else if(c_color == NEUTRAL_COLOR && current_state != STATE_SEARCHING)
-  {
-    set_state(STATE_SEARCHING);
-  }
   
   // Performs state actions
-  handle_state();
+  handle_state();*/
+      analogWrite(MOTOR_LEFT_F,  duty_cycle_to_byte(motor_duty_cycle));
+    analogWrite(MOTOR_LEFT_R,  duty_cycle_to_byte(0));
+    analogWrite(MOTOR_RIGHT_F, duty_cycle_to_byte(motor_duty_cycle));
+    analogWrite(MOTOR_RIGHT_R, duty_cycle_to_byte(0));
  
 }
 
