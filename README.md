@@ -6,15 +6,16 @@ Our swarmbot is composed of six independent modules designed to promote the sing
 #### Power:  
 *	Input: 9V battery, ON/OFF Switch  
 *	Output:  
-  * Power Supply H (Vcc_H) – high current power supply (250 mA to 2A)  
-  * Power Supply L (Vcc_L) – low current power supply (0-250 mA)  
+  * Power Supply HP (Vcc_HP)  9V – high current positive voltage power supply (250 mA to 2A)  
+  * Power Supply HN (Vcc_HN) -9V - high current negative voltage power supply (250 mA to 2A)
+  * Power Supply L (Vcc_L)    5V – low current power supply (0-250 mA)  
 *	Functionality: deliver power to all modules  
 
 #### Collision:  
 *	Input: Vcc_L, actuator  
 *	Output: collision interrupt to main logic  
 *	Functionality:  
-  *	Sensor – 8 button or paddle actuators located on the perimeter of the bot  
+  *	Sensor – 6 button or paddle actuators located on the perimeter of the bot  
   *	All sensor outputs will be logic “OR”ed together connected to an interrupt pin in main logic.  Each sensor output will also be connected to its own digital input pin in main logic.  
   *	Decoding occurs in software.  
 
@@ -27,11 +28,10 @@ Our swarmbot is composed of six independent modules designed to promote the sing
   *	Flash LED upon detection.  
 
 #### Communication:    
-*	Input: Vcc_L, IR photosensor  
-*	Output: IR signal, communication interrupt to main logic  
+*	Input: Vcc_L, Vcc_HN, Vcc_HP, IR photosensor  
+*	Output: IR signal, Recieved Signal
 *	Functionality:  
-  *	Transmit and receive a specific communication protocol (TBD) with companion swarm bot.  
-  *	Input decoded in software.  
+  *	Transmit and receive serial communication over IR at 600 baud AM by 20 KHz
 
 #### Drive:   
 *	Input: Vcc_H, right wheel logic (2 lines), left wheel logic (2 lines)  
