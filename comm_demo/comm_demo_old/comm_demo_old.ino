@@ -18,7 +18,7 @@ void setup(){
   OCR3A = 51;
   // above sets the counter value at which register resets to 0x0000;
   // generate 20kHz when OCR3A=50
-  Serial.println(TCCR3A, BIN);Serial.println(TCCR3B, BIN);
+  //Serial.println(TCCR3A, BIN);Serial.println(TCCR3B, BIN);
 }
 void loop(){
   digitalWrite(MOD, HIGH);
