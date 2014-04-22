@@ -74,7 +74,7 @@ const int NEUTRAL_COLOR = 0;
 
 // Tx/Rx Constants
 const int CARRIER_PIN = 5;
-const int TX_PIN = 7;
+const int TX_PIN = 18;
 const int RX_PIN = 13;
 const int NUM_LISTENS = 5;
 const int FOUND_RED  = 0;
@@ -82,6 +82,7 @@ const int FOUND_BLUE = 1;
 const int HEARD_YOU  = 2;
 const int MSG_DELAY = 800; //us
 const int TX_MSG_LEN = 10; //bits
+const int RX_CTRL_PIN = 33;
 
 // Collision Detector Constants
 const int COLLISION_INTERRUPT_PIN = 21;
@@ -170,7 +171,7 @@ void setup() {
   init_collision_detector();
   
   // Initialize state machine to desired initial state
-  set_state(STATE_STOPPED);
+  set_state(STATE_TX);
   
   // let all pins settle
   delay(1000);
@@ -345,7 +346,7 @@ void handle_state()
   // We are transmitting
   if (current_state == STATE_TX)
   {
-    
+    digitalWrite(RX_CTRL_PIN, HIGH);  
     for(int i = 0; i < TX_MSG_LEN; i++)
     {
       digitalWrite(TX_PIN, !tx_msg[i]);
@@ -771,6 +772,7 @@ void init_tx_rx()
   pinMode(CARRIER_PIN, OUTPUT); 
   pinMode(TX_PIN, OUTPUT);
   pinMode(RX_PIN, INPUT);
+  pinMode(RX_CTRL_PIN, OUTPUT);
  
   TCCR3A = _BV(COM3A0) | _BV(COM3B0) | _BV(WGM30) | _BV(WGM31);
   // sets COM Output Mode to FastPWM with toggle of OC3A on compare match with OCR3A
@@ -826,3 +828,4 @@ void init_color_sensor()
   calib_offset = temp_offset;
   Timer1.attachInterrupt(flash);
 }
+
