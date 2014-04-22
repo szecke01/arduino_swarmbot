@@ -7,7 +7,7 @@
 #define LCD_PIN 31
 #define NO_COLOR -10
 
-#define DEBUG 1
+#define DEBUG 0
 
 /************************
   *  Authors: Sam Z     *
@@ -155,7 +155,7 @@ void setup() {
   Serial.begin(9600);
   
   // Initialize Timer
-  Timer1.initialize();
+  Timer1.initialize(50000);
   
   // Initialize and calibrate color sensor
   init_color_sensor();
@@ -348,7 +348,7 @@ void handle_state()
     
     for(int i = 0; i < TX_MSG_LEN; i++)
     {
-      digitalWrite(TX_PIN, tx_msg[i]);
+      digitalWrite(TX_PIN, !tx_msg[i]);
       delayMicroseconds(MSG_DELAY/2);
       Serial.print(digitalRead(RX_PIN));
       Serial.print(" ");
@@ -793,6 +793,11 @@ void init_collision_detector()
   
 }
 
+void rx_read()
+{
+  digitalRead(RX_PIN);
+}
+
 void init_color_sensor()
 {
    // Establish color params
@@ -819,5 +824,5 @@ void init_color_sensor()
     temp_offset = color_diff;
   }
   calib_offset = temp_offset;
-  Timer1.attachInterrupt(flash, 50000);
+  Timer1.attachInterrupt(flash);
 }
