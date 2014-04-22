@@ -1,5 +1,5 @@
 const int CARRIER = 5;
-const int MOD = 7;
+const int MOD = 18;
 const int RX  = 13;
 
 void setup(){
