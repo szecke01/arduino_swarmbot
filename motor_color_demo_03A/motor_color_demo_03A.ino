@@ -3,7 +3,7 @@
 /************************
   *  Authors: Sam Z     *
   *           Cooper L  *
-  *           Chris R   *
+  *           Chris R   *s
   *  Date: 2/4/2014     *
   *  Project:           *
   *    H-Bridge Arduino *
@@ -47,6 +47,10 @@ const int RED_COLOR  = -1;
 const int BLUE_COLOR = 1;
 const int NEUTRAL_COLOR = 0;
 
+// Collision Detector Constants
+const int COLLISION_INTERRUPT_PIN = 21;
+const int COLLISION_INTERRUPT_NO  = 2;
+
 // Color sensor variables
 boolean color_sensor_output = LOW;
 int last_red     = -1;
@@ -58,6 +62,10 @@ int color_sense_buffer_index = 0;
 
 // Searching algorithm paramters
 long last_search_time = 0;
+
+// Collision Detector parameters
+long last_collide_time = 0;
+boolean collided = false;
 
 // Current arduino state
 int current_state;
@@ -77,36 +85,30 @@ void setup() {
   // Establish H-Bridge inputs as outputs from arduino
   init_motor_control();
   
+  // Initialize collision detector interrupts
+  init_collision_detector();
+  
   // Initialize state machine to desired initial state
-  set_state(STATE_STOPPED);
+  set_state(STATE_FORWARD);
   
   // Searching parameters
   
 }
 
 void loop() {
-  
+  /*
   // If RED!
   int c_color = calculate_color();
   //Serial.print("The time diff is: ");
   //Serial.println(millis() - last_search_time);
   
-  // if BLUE OR RED
-  if((c_color == BLUE_COLOR) && current_state != STATE_FORWARD)
-    {
-      set_state(STATE_FORWARD);
-    }
-  else if((c_color == RED_COLOR))
-   {
-     set_state(STATE_STOPPED);
-   }
-  else if(c_color == NEUTRAL_COLOR && current_state != STATE_SEARCHING)
-  {
-    set_state(STATE_SEARCHING);
-  }
   
   // Performs state actions
-  handle_state();
+  handle_state();*/
+      analogWrite(MOTOR_LEFT_F,  duty_cycle_to_byte(motor_duty_cycle));
+    analogWrite(MOTOR_LEFT_R,  duty_cycle_to_byte(0));
+    analogWrite(MOTOR_RIGHT_F, duty_cycle_to_byte(motor_duty_cycle));
+    analogWrite(MOTOR_RIGHT_R, duty_cycle_to_byte(0));
  
 }
 
@@ -214,6 +216,10 @@ void handle_state()
     else
       last_search_time = millis();
   }
+  if(millis() - last_collide_time > 1000 && collided)
+  {
+    collision_refresh();
+  }
 }
 
 // Sets analog out for motor to zero
@@ -285,6 +291,25 @@ int calculate_color()
   return 0;
 }
 
+void handle_collision()
+{
+  
+ detachInterrupt(COLLISION_INTERRUPT_NO);
+ 
+ // timer begin
+ // when timer ends, call collision refresh
+ last_collide_time = millis();
+ collided = true;
+ Serial.println("I AM COLLIDING");
+
+}
+
+void collision_refresh()
+{
+  collided = false;
+  attachInterrupt(COLLISION_INTERRUPT_NO, handle_collision, RISING);
+}
+
 void init_color_sensor()
 {
    // Establish color params
@@ -310,6 +335,12 @@ void init_color_sensor()
   }
   calib_offset = temp_offset;
   Timer1.attachInterrupt(flash, 50000);
+}
+
+void init_collision_detector()
+{
+  attachInterrupt(COLLISION_INTERRUPT_NO, handle_collision, RISING);
+  
 }
 
 void init_motor_control()

@@ -1,5 +1,6 @@
 const int CARRIER = 5;
 const int MOD = 7;
+const int RX  = 13;
 
 void setup(){
   // pinMode(13, OUTPUT); // Set this pin as output
@@ -22,7 +23,7 @@ void setup(){
 }
 void loop(){
   digitalWrite(MOD, HIGH);
-  delayMicroseconds(800);
+  delayMicroseconds(8000);
   digitalWrite(MOD, LOW);
-  delayMicroseconds(800);
+  delayMicroseconds(8000);
 }

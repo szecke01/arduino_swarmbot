@@ -1,4 +1,9 @@
 #include <TimerOne.h>
+#include <SoftwareSerial.h>
+#include <ParallaxLCD.h>
+
+#define ROWS 2
+#define COLS 16
 
 /************************
   *  Authors: Sam Z     *
@@ -15,22 +20,28 @@
 */
 
 // Motor Control Pins
-const int MOTOR_LEFT_F  = 8;  
-const int MOTOR_LEFT_R  = 9;
-const int MOTOR_RIGHT_F = 10;
-const int MOTOR_RIGHT_R = 11; 
+const int MOTOR_LEFT_F  = 4;  
+const int MOTOR_LEFT_R  = 2;
+const int MOTOR_RIGHT_F = 3;
+const int MOTOR_RIGHT_R = 6; 
 
 // State values
-const int STATE_STOPPED    = 0;
-const int STATE_FORWARD    = 1;
-const int STATE_REVERSE    = 2;
-const int STATE_PIVOT_CCW  = 3;
-const int STATE_PIVOT_CW   = 4;
-const int STATE_TURN_CCW   = 5;
-const int STATE_TURN_CW    = 6;
-const int STATE_SEARCHING  = 7;
-const int STATE_RX         = 8;
-const int STATE_TX         = 9; 
+const int STATE_STOPPED     = 0;
+const int STATE_FOL_COLOR   = 1; // Following Color
+const int STATE_SEARCHING   = 2; // Look for colored paper by 
+const int STATE_REFIND_LINE = 3; // Went off the color line, find it again
+const int STATE_RX          = 4;
+const int STATE_TX          = 5; 
+const int STATE_COLLIDED    = 6;
+
+// Action values
+const int ACTION_FORWARD   = 0;
+const int ACTION_REVERSE   = 1;
+const int ACTION_PIVOT_CCW = 2;
+const int ACTION_PIVOT_CW  = 3;
+const int ACTION_TURN_CCW  = 4;
+const int ACTION_TURN_CW   = 5;
+const int ACTION_STOPPED   = 6;
 
 // Motor Constants
 const float TURN_SPEED_RATIO = .25;
@@ -51,9 +62,18 @@ const int NEUTRAL_COLOR = 0;
 
 // Tx/Rx Constants
 const int CARRIER_PIN = 5;
-const int TX_PIN = 4;
+const int TX_PIN = 7;
 const int RX_PIN = 2;
 const int NUM_LISTENS = 5;
+const int FOUND_RED  = 0;
+const int FOUND_BLUE = 1;
+const int HEARD_YOU  = 2;
+
+// Collision Detector Constants
+const int COLLISION_INTERRUPT_PIN = 21;
+const int COLLISION_INTERRUPT_NO  = 2;
+const int COLLISION_SWITCH_PINS[] = {41,43,45,47,49,51};
+const int NUM_COLLISION_PINS = 6;
 
 // Color sensor variables
 boolean color_sensor_output = LOW;
@@ -73,19 +93,24 @@ int color_sense_buffer_index = 0;
 // if 7: FOUND_RED
 // if 4: FOUND_BLUE
 // if 2: HEARD_YOU
-boolean tx_msg = {0,0,0,0,0,0,0,0,0,0}; 
-boolean rx_msg = {0,0,0,0,0,0,0,0,0,0};
-int FOUND_RED  = 0;
-int FOUND_BLUE = 1;
-int HEARD_YOU  = 2;
-int NUM_LISTENS = 5;
+// 
+boolean tx_msg[] = {0,0,0,0,0,0,0,0,0,0}; 
+boolean rx_msg[] = {0,0,0,0,0,0,0,0,0,0};
 String rx_str  = "";
 
 // Searching algorithm paramters
 long last_search_time = 0;
 
+// Collision Detector parameters
+long last_collide_time = 0;
+int collision_states[] = {0,0,0,0,0,0};
+boolean collision_triggers_found = 0;
+
 // Current arduino state
 int current_state;
+int current_action;
+int last_state;
+int fol_color; // Color to follow (either found, or communication dictated)
 float motor_duty_cycle;
 
 void setup() {
@@ -105,10 +130,17 @@ void setup() {
   // Begin sending carrier signal to pin 5 and set the data pin low. 
   init_tx_rx();
   
-  // Initialize state machine to desired initial state
-  set_state(STATE_TX);
+  // Initialize collision detector interrupts
+  init_collision_detector();
   
- 
+  // Initialize state machine to desired initial state
+  set_state(STATE_SEARCHING);
+  
+  // Currently not following red or blue (red = 1, blue = -1)
+  fol_color = 0;
+  
+  // let all pins settle
+  delay(1000);
   
 }
 
@@ -117,22 +149,10 @@ void loop() {
   // Calculate the sensed color
   int c_color = calculate_color();
   
-  // if BLUE OR RED
-  if((c_color == BLUE_COLOR) && current_state == STATE_SEARCHING)
-    {
-      set_state(STATE_FORWARD);
-    }
-  else if((c_color == RED_COLOR))
-   {
-     set_state(STATE_STOPPED);
-   }
-  else if(c_color == NEUTRAL_COLOR && current_state == STATE_FORWARD)
-  {
-    set_state(STATE_SEARCHING);
-  }
   
   // Performs state actions
   handle_state();
+  handle_action();
  
 }
 
@@ -140,14 +160,22 @@ void loop() {
 void set_state(int new_state)
 {
   // prevent shoot-through, set state
+  last_state = state;
   stop_motor();
   delay(STATE_CHANGE_DELAY);
   current_state = new_state;
   
   // state specific event_handling
-  if(current_state == STATE_SEARCHING)
+  if(current_state == STATE_REFIND_LINE)
     last_search_time = millis();
   
+}
+
+void set_action(int new_action)
+{
+  stop_motor();
+  delay(STATE_CHANGE_DELAY);
+  current_action = new_action; 
 }
 
 void handle_state()
@@ -155,88 +183,48 @@ void handle_state()
   // Iterate through FSM and perform current state
   // Not using else-if's in case interrupt causes 
   // state changes
+  
+  if (current_state == STATE_FOL_COLOR)
+  {
+    if(fol_color == -1) //blue
+    {
+      
+    }
+    else if(fol_color == 1) //red
+    {
+      
+    }
+  }
+  if (current_state == STATE_SEARCHING)
+  {
+    set_action(ACTION_FORWARD);
+  }
   if (current_state == STATE_STOPPED)
   {
     stop_motor();
   }
-  
-  if (current_state == STATE_FORWARD)
-  {
-    analogWrite(MOTOR_LEFT_F,  duty_cycle_to_byte(motor_duty_cycle));
-    analogWrite(MOTOR_LEFT_R,  duty_cycle_to_byte(0));
-    analogWrite(MOTOR_RIGHT_F, duty_cycle_to_byte(motor_duty_cycle));
-    analogWrite(MOTOR_RIGHT_R, duty_cycle_to_byte(0));
-  }
-  
-  if (current_state == STATE_REVERSE)
-  {
-    analogWrite(MOTOR_LEFT_F,  duty_cycle_to_byte(0));
-    analogWrite(MOTOR_LEFT_R,  duty_cycle_to_byte(motor_duty_cycle));
-    analogWrite(MOTOR_RIGHT_F, duty_cycle_to_byte(0));
-    analogWrite(MOTOR_RIGHT_R, duty_cycle_to_byte(motor_duty_cycle));
-  }  
-  
-  if (current_state == STATE_PIVOT_CW)
-  {
-    analogWrite(MOTOR_LEFT_F,  duty_cycle_to_byte(motor_duty_cycle));
-    analogWrite(MOTOR_LEFT_R,  duty_cycle_to_byte(0));
-    analogWrite(MOTOR_RIGHT_F, duty_cycle_to_byte(0));
-    analogWrite(MOTOR_RIGHT_R, duty_cycle_to_byte(motor_duty_cycle)); 
-  }
-  
-  if (current_state == STATE_PIVOT_CCW)
-  {
-    analogWrite(MOTOR_LEFT_F,  duty_cycle_to_byte(0));
-    analogWrite(MOTOR_LEFT_R,  duty_cycle_to_byte(motor_duty_cycle));
-    analogWrite(MOTOR_RIGHT_F, duty_cycle_to_byte(motor_duty_cycle));
-    analogWrite(MOTOR_RIGHT_R, duty_cycle_to_byte(0)); 
-  }
-  if (current_state == STATE_TURN_CW)
-  {
-    analogWrite(MOTOR_LEFT_F,  duty_cycle_to_byte(motor_duty_cycle*TURN_SPEED_RATIO));
-    analogWrite(MOTOR_LEFT_R,  duty_cycle_to_byte(0));
-    analogWrite(MOTOR_RIGHT_F, duty_cycle_to_byte(motor_duty_cycle));
-    analogWrite(MOTOR_RIGHT_R, duty_cycle_to_byte(0));    
-  }
-  if (current_state == STATE_TURN_CCW)
-  {
-    analogWrite(MOTOR_LEFT_F,  duty_cycle_to_byte(motor_duty_cycle));
-    analogWrite(MOTOR_LEFT_R,  duty_cycle_to_byte(0));
-    analogWrite(MOTOR_RIGHT_F, duty_cycle_to_byte(motor_duty_cycle*TURN_SPEED_RATIO));
-    analogWrite(MOTOR_RIGHT_R, duty_cycle_to_byte(0));    
-  }
-  if (current_state == STATE_SEARCHING)
+  if (current_state == STATE_REFIND_LINE)
   {
     
     if(millis() - last_search_time < 600)
     {
       // Turn clockwise
-      analogWrite(MOTOR_LEFT_F,  duty_cycle_to_byte(motor_duty_cycle));
-      analogWrite(MOTOR_LEFT_R,  duty_cycle_to_byte(0));
-      analogWrite(MOTOR_RIGHT_F, duty_cycle_to_byte(0));
-      analogWrite(MOTOR_RIGHT_R, duty_cycle_to_byte(motor_duty_cycle)); 
+      set_action(ACTION_PIVOT_CW);
     }
     else if(millis() - last_search_time < 650)
       stop_motor();
     else if(millis() - last_search_time < 1850)
     {
       // Turn counter-clockwise
-      analogWrite(MOTOR_LEFT_F,  duty_cycle_to_byte(0));
-      analogWrite(MOTOR_LEFT_R,  duty_cycle_to_byte(motor_duty_cycle));
-      analogWrite(MOTOR_RIGHT_F, duty_cycle_to_byte(motor_duty_cycle));
-      analogWrite(MOTOR_RIGHT_R, duty_cycle_to_byte(0)); 
+      set_action(ACTION_PIVOT_CCW);
     }
     else if(millis() - last_search_time < 2250)
     {
        // Turn clockwise again
-      analogWrite(MOTOR_LEFT_F,  duty_cycle_to_byte(motor_duty_cycle));
-      analogWrite(MOTOR_LEFT_R,  duty_cycle_to_byte(0));
-      analogWrite(MOTOR_RIGHT_F, duty_cycle_to_byte(0));
-      analogWrite(MOTOR_RIGHT_R, duty_cycle_to_byte(motor_duty_cycle)); 
-
+      set_action(ACTION_PIVOT_CW);
     }
     else if(millis() - last_search_time < 2300)
-      stop_motor();
+      set_action(ACTION_STOPPED);
     else
       last_search_time = millis();
   }
@@ -247,6 +235,80 @@ void handle_state()
   if (current_state == STATE_RX)
   {
     
+  }
+  if (current_state == STATE_COLLIDED)
+  {
+    
+    if(last_state == STATE_SEARCHING && collision_triggers_found)
+    {
+      if(millis() - last_collide_time > 1000)
+      {
+        set_action(ACTION_PIVOT_CCW);
+      }
+      if(millis() - last_collide_time > 2500) {
+        set_state(STATE_SEARCHING);
+      }
+    }
+    
+    // Waits one second before accepting new collision interrupts
+    if(millis() - last_collide_time > 1000 && !collision_triggers_found)
+    {
+      find_collision_triggers();
+    }
+
+  }
+}
+
+void handle_action()
+{
+  if (current_action == ACTION_STOPPED)
+  {
+    stop_motor();
+  }
+  if (current_action == ACTION_FORWARD)
+  {
+    analogWrite(MOTOR_LEFT_F,  duty_cycle_to_byte(motor_duty_cycle));
+    analogWrite(MOTOR_LEFT_R,  duty_cycle_to_byte(0));
+    analogWrite(MOTOR_RIGHT_F, duty_cycle_to_byte(motor_duty_cycle));
+    analogWrite(MOTOR_RIGHT_R, duty_cycle_to_byte(0));
+  }
+  
+  if (current_action == ACTION_REVERSE)
+  {
+    analogWrite(MOTOR_LEFT_F,  duty_cycle_to_byte(0));
+    analogWrite(MOTOR_LEFT_R,  duty_cycle_to_byte(motor_duty_cycle));
+    analogWrite(MOTOR_RIGHT_F, duty_cycle_to_byte(0));
+    analogWrite(MOTOR_RIGHT_R, duty_cycle_to_byte(motor_duty_cycle));
+  }  
+  
+  if (current_action == ACTION_PIVOT_CW)
+  {
+    analogWrite(MOTOR_LEFT_F,  duty_cycle_to_byte(motor_duty_cycle));
+    analogWrite(MOTOR_LEFT_R,  duty_cycle_to_byte(0));
+    analogWrite(MOTOR_RIGHT_F, duty_cycle_to_byte(0));
+    analogWrite(MOTOR_RIGHT_R, duty_cycle_to_byte(motor_duty_cycle)); 
+  }
+  
+  if (current_action == ACTION_PIVOT_CCW)
+  {
+    analogWrite(MOTOR_LEFT_F,  duty_cycle_to_byte(0));
+    analogWrite(MOTOR_LEFT_R,  duty_cycle_to_byte(motor_duty_cycle));
+    analogWrite(MOTOR_RIGHT_F, duty_cycle_to_byte(motor_duty_cycle));
+    analogWrite(MOTOR_RIGHT_R, duty_cycle_to_byte(0)); 
+  }
+  if (current_action == ACTION_TURN_CW)
+  {
+    analogWrite(MOTOR_LEFT_F,  duty_cycle_to_byte(motor_duty_cycle*TURN_SPEED_RATIO));
+    analogWrite(MOTOR_LEFT_R,  duty_cycle_to_byte(0));
+    analogWrite(MOTOR_RIGHT_F, duty_cycle_to_byte(motor_duty_cycle));
+    analogWrite(MOTOR_RIGHT_R, duty_cycle_to_byte(0));    
+  }
+  if (current_action == ACTION_TURN_CCW)
+  {
+    analogWrite(MOTOR_LEFT_F,  duty_cycle_to_byte(motor_duty_cycle));
+    analogWrite(MOTOR_LEFT_R,  duty_cycle_to_byte(0));
+    analogWrite(MOTOR_RIGHT_F, duty_cycle_to_byte(motor_duty_cycle*TURN_SPEED_RATIO));
+    analogWrite(MOTOR_RIGHT_R, duty_cycle_to_byte(0));    
   }
 }
 
@@ -348,6 +410,40 @@ void init_color_sensor()
   Timer1.attachInterrupt(flash, 50000);
 }
 
+void handle_collision()
+{
+  
+ detachInterrupt(COLLISION_INTERRUPT_NO);
+ 
+ // timer begin
+ // when timer ends, call collision refresh
+ last_collide_time = millis();
+ collision_triggers_found = false;
+ set_state(STATE_COLLIDED);
+
+}
+
+// After waiting a second after collision, we determine what switches have been triggered
+void find_collision_triggers()
+{
+  
+    Serial.println("The bumpers detected are: {");
+    for(int i = 0; i < NUM_COLLISION_PINS; i++)
+    {
+      collision_states[i] = digitalRead(COLLISION_SWITCH_PINS[i];
+      if(collision_states[i])
+      {
+        Serial.print(i);
+        Serial.print(" ");
+      }
+    }
+    Serial.print("}");
+    Serial.println("");
+    collision_triggers_found = true;
+    attachInterrupt(COLLISION_INTERRUPT_NO, handle_collision, RISING);
+    
+}
+
 void init_motor_control()
 {
   // Assign motor to proper pins
@@ -377,4 +473,13 @@ void init_tx_rx()
   OCR3A = 51;
 }
 
+void init_collision_detector()
+{
+  
+  for(int i = 0; i < NUM_COLLISION_PINS; i++)
+    pinMode(COLLISION_SWITCH_PINS[i], INPUT_PULLUP);
+  
+  attachInterrupt(COLLISION_INTERRUPT_NO, handle_collision, RISING);
+  
+}
 
