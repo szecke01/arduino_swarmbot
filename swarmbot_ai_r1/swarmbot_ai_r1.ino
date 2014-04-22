@@ -62,10 +62,10 @@ const int PIVOT_TIME_90 = 630;
 const int PIVOT_TIME_60 = 420;
 
 // Color Sensor Constants
-const int RED_LED_PIN = 15;
-const int BLUE_LED_PIN = 14;
-const int COLOR_SENSOR_PIN = 0;
-const int LED_FLASH_PERIOD = 41000000;
+const int RED_LED_PIN = 26;
+const int BLUE_LED_PIN = 24;
+const int COLOR_SENSOR_PIN = 7;
+const int LED_FLASH_PERIOD = 50;
 const int MIN_DIFF_THRESHOLD = 20;
 const int COLOR_SENSE_BUFFER_SIZE = 2;
 const int RED_COLOR  = -1;
@@ -74,15 +74,15 @@ const int NEUTRAL_COLOR = 0;
 
 // Tx/Rx Constants
 const int CARRIER_PIN = 5;
-const int TX_PIN = 18;
-const int RX_PIN = 13;
 const int NUM_LISTENS = 5;
 const int FOUND_RED  = 0;
 const int FOUND_BLUE = 1;
 const int HEARD_YOU  = 2;
 const int MSG_DELAY = 800; //us
 const int TX_MSG_LEN = 10; //bits
-const int RX_CTRL_PIN = 33;
+const int RX_MASK_PIN = 33;
+const int RX_INTERRUPT_PIN = 19;
+const int RX_INTERRUPT_NO = 4
 
 // Collision Detector Constants
 const int COLLISION_INTERRUPT_PIN = 21;
@@ -95,7 +95,7 @@ const int FR_COL_INDEX = 1; // front right collision index
 const int L_COL_INDEX  = 4; // left side collision index
 const int R_COL_INDEX  = 2; // right side collision index
 const int B_COL_INDEX  = 0; // bumper collision index
-const int COLLISION_REFRESH_TIME = 1000;
+const int COLLISION_REFRESH_TIME = 100;
 
 // Color sensor variables
 boolean color_sensor_output = LOW;
@@ -105,6 +105,7 @@ int color_diff   = 0;
 int calib_offset = 0; 
 int color_sense_buffer[COLOR_SENSE_BUFFER_SIZE];
 int color_sense_buffer_index = 0;
+int last_sense_time = 0;
 
 // Tx/Rx variables
 // I FOUND RED:  {1,1,1,1,1,1,1,0,0,0}; 7 1's per 10 bits
@@ -148,15 +149,14 @@ void setup() {
   delay(100);
   lcd.cursorOff();
   lcd.backLightOn();
-  lcd.at(0,4,"420 Blaze\0");
+  lcd.at(0,4,"Let's Go!\0");
   delay(1000);
-  //lcd.empty();
   
   // Serial (for debugging)
   Serial.begin(9600);
   
   // Initialize Timer
-  Timer1.initialize(50000);
+  // Timer1.initialize(50000);
   
   // Initialize and calibrate color sensor
   init_color_sensor();
@@ -167,14 +167,14 @@ void setup() {
   // Begin sending carrier signal to pin 5 and set the data pin low. 
   init_tx_rx();
   
-  // Initialize collision detector interrupts
-  init_collision_detector();
-  
   // Initialize state machine to desired initial state
-  set_state(STATE_TX);
+  set_state(STATE_STOPPED);
   
   // let all pins settle
   delay(1000);
+  
+  // Initialize collision detector interrupts
+  init_collision_detector();
   
 }
 
@@ -183,6 +183,9 @@ void loop() {
   //Serial.println(fol_color);
   if(DEBUG)
     motor_duty_cycle = 0;
+  
+  // Performs sensing
+  sense_color();
   
   // Performs state actions
   handle_state();
@@ -251,8 +254,8 @@ void set_action(int new_action)
   if(current_action != new_action)
   {
     lcd.empty();
-    lcd.at(0,4,STATE_STRINGS[current_state]);
-    lcd.at(1,4,ACTION_STRINGS[new_action]);
+    lcd.at(0,3,STATE_STRINGS[current_state]);
+    lcd.at(1,3,ACTION_STRINGS[new_action]);
     
     // prevent shoot-through, set action
     stop_motor();
@@ -346,7 +349,7 @@ void handle_state()
   // We are transmitting
   if (current_state == STATE_TX)
   {
-    digitalWrite(RX_CTRL_PIN, HIGH);  
+   /* 
     for(int i = 0; i < TX_MSG_LEN; i++)
     {
       digitalWrite(TX_PIN, !tx_msg[i]);
@@ -354,8 +357,8 @@ void handle_state()
       Serial.print(digitalRead(RX_PIN));
       Serial.print(" ");
       delayMicroseconds(MSG_DELAY/2);
-    }
-    Serial.println(" ");
+    }*/
+    //Serial.println(" ");
     /*
     delayMicroseconds(800);
     digitalWrite(TX_PIN, tx_data);
@@ -373,7 +376,7 @@ void handle_state()
   // We are recieving
   if (current_state == STATE_RX)
   {
-    Serial.println(digitalRead(RX_PIN));
+  //  Serial.println(digitalRead(RX_PIN));
   }
   
   // Turn around after hitting end
@@ -422,17 +425,21 @@ void handle_state()
     
       if(collision_triggers_found)
       {
-        // if searching for color
-        if(last_state == STATE_FOL_COLOR || last_state == STATE_REFIND_LINE)
-        {
-          int c_color = calculate_color();
-          if(c_color == fol_color)
+        // see color
+        int c_color = calculate_color();
+        
+        if(fol_color == NO_COLOR && c_color != NEUTRAL_COLOR)
           {
-            returning = true;
-            turn_arnd_time = millis();
-            set_state(STATE_TURN_ARND);
+            fol_color = c_color;
+            set_state(STATE_REFIND_LINE);
           }
+        else if(c_color == fol_color)
+        {
+          returning = true;
+          turn_arnd_time = millis();
+          set_state(STATE_TURN_ARND);
         }
+         
         
         // front 3
         if(collision_states[FL_COL_INDEX] && collision_states[FC_COL_INDEX] && collision_states[FR_COL_INDEX])
@@ -768,11 +775,17 @@ void init_motor_control()
 
 void init_tx_rx()
 {
-  
   pinMode(CARRIER_PIN, OUTPUT); 
-  pinMode(TX_PIN, OUTPUT);
-  pinMode(RX_PIN, INPUT);
-  pinMode(RX_CTRL_PIN, OUTPUT);
+  pinMode(RX_MASK_PIN, OUTPUT);
+  
+  // HIGH = reading enabled, LOW = reading disabled
+  digitalWrite(RX_MASK_PIN, HIGH);
+  //Serial1.begin(600);
+  
+  attachInterrupt(RX_INTERRUPT_NO, rx_isr(), RISING);
+  
+  //pinMode(TX_PIN, OUTPUT);
+  //pinMode(RX_PIN, INPUT);
  
   TCCR3A = _BV(COM3A0) | _BV(COM3B0) | _BV(WGM30) | _BV(WGM31);
   // sets COM Output Mode to FastPWM with toggle of OC3A on compare match with OCR3A
@@ -782,7 +795,6 @@ void init_tx_rx()
   // sets WGM as stated above; sets clock scaling to "divide by 8"
   
   OCR3A = 51;
-  
 }
 
 void init_collision_detector()
@@ -795,15 +807,10 @@ void init_collision_detector()
   
 }
 
-void rx_read()
-{
-  digitalRead(RX_PIN);
-}
 
 void init_color_sensor()
 {
    // Establish color params
-  Serial.begin(9600);
   pinMode(RED_LED_PIN, OUTPUT);
   pinMode(BLUE_LED_PIN, OUTPUT);
   
@@ -826,6 +833,19 @@ void init_color_sensor()
     temp_offset = color_diff;
   }
   calib_offset = temp_offset;
-  Timer1.attachInterrupt(flash);
+  // Timer1.attachInterrupt(flash);
+}
+
+void sense_color()
+{
+  if(millis() - last_sense_time > LED_FLASH_PERIOD) 
+  {
+    flash();
+    last_sense_time = millis();
+  }
+}
+
+rx_isr() {
+  set_state(STATE_RX);
 }
 
