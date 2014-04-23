@@ -36,12 +36,12 @@ const int STATE_STOPPED     = 0;
 const int STATE_FOL_COLOR   = 1; // Following Color
 const int STATE_SEARCHING   = 2; // Look for colored paper by 
 const int STATE_REFIND_LINE = 3; // Went off the color line, find it again
-const int STATE_RX          = 4;
-const int STATE_TX          = 5; 
+const int STATE_MASTER      = 4;
+const int STATE_SLAVE       = 5; 
 const int STATE_COLLIDED    = 6;
 const int STATE_TURN_ARND   = 7;
 const int STATE_DONE        = 8;
-String STATE_STRINGS[]   = {"stopped", "following ", "searching" ,"refinding", "rx", "tx", "collided", "turning around", "finished"};
+String STATE_STRINGS[]   = {"stopped", "following ", "searching" ,"refinding", "master", "slave", "collided", "turning around", "finished", "slave"};
 
 // Action values
 const int ACTION_FORWARD     = 0;
@@ -79,10 +79,68 @@ const int FOUND_RED  = 0;
 const int FOUND_BLUE = 1;
 const int HEARD_YOU  = 2;
 const int MSG_DELAY = 800; //us
-const int TX_MSG_LEN = 10; //bits
+const int MSG_LEN = 50; //bits
+const int TX_PIN = 18;
 const int RX_MASK_PIN = 33;
 const int RX_INTERRUPT_PIN = 19;
-const int RX_INTERRUPT_NO = 4
+const int RX_INTERRUPT_NO = 4;
+const int RX_EDGE_COUNT_MIN = 2; // edges
+const int RX_EDGE_TIMEOUT = 1000; // us 
+
+// Slave states
+const int SLAVE_STATE_LISTEN_MESSAGE           = 0;
+const int SLAVE_STATE_RESPOND_HEARD            = 1;
+const int SLAVE_STATE_RESPOND_FINISHED_COMM    = 2;
+
+
+// Message IDs
+const int MSG_HELLO_ID           = 0;
+const int MSG_HEARD_ID           = 1;
+const int MSG_FOUND_BLUE_ID      = 2;
+const int MSG_FOUND_RED_ID       = 3;
+const int MSG_DONE_ID            = 4;
+const int MSG_INVALID_ID    = 5;
+
+const int MSG_LIST[] = { MSG_INVALID_ID, MSG_HEARD_ID, MSG_INVALID_ID, MSG_FOUND_BLUE_ID, MSG_INVALID_ID, MSG_FOUND_RED_ID, MSG_INVALID_ID, MSG_DONE_ID, MSG_INVALID_ID, MSG_INVALID_ID, MSG_INVALID_ID};
+
+// Messages
+const boolean MSG_HELLO[]      = {1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+                              1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+                              1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+                              1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+                              1, 1, 1, 1, 1, 1, 1, 1, 1, 1};
+                         
+const boolean MSG_HEARD[]      = {1, 1, 1, 1, 1, 0, 0, 0, 0, 0,
+                              0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
+                              0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
+                              0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
+                              0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+
+const boolean MSG_FOUND_BLUE[] = {1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+                              1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 
+                              0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
+                              0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
+                              0, 0, 0, 0, 0, 0, 0, 0, 0, 0};            
+
+const boolean MSG_FOUND_RED[]  = {1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+                              1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 
+                              1, 1, 1, 1, 1, 0, 0, 0, 0, 0,  
+                              0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
+                              0, 0, 0, 0, 0, 0, 0, 0, 0, 0};      
+    
+const boolean MSG_DONE[]       = {1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+                              1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 
+                              1, 1, 1, 1, 1, 1, 1, 1, 1, 1,  
+                              1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 
+                              0, 0, 0, 0, 0, 0, 0, 0, 0, 0};                            
+
+// if recieved message is this, it is invalid
+const int MSG_RCVD_INVALID[]      = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
+                                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
+                                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
+                                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+                                                                     
 
 // Collision Detector Constants
 const int COLLISION_INTERRUPT_PIN = 21;
@@ -105,7 +163,6 @@ int color_diff   = 0;
 int calib_offset = 0; 
 int color_sense_buffer[COLOR_SENSE_BUFFER_SIZE];
 int color_sense_buffer_index = 0;
-int last_sense_time = 0;
 
 // Tx/Rx variables
 // I FOUND RED:  {1,1,1,1,1,1,1,0,0,0}; 7 1's per 10 bits
@@ -120,8 +177,10 @@ int last_sense_time = 0;
 boolean tx_msg[] = {0,1,1,0,1,1,1,0,1,0}; 
 boolean rx_msg[] = {0,1,1,0,1,1,1,0,1,0};
 String rx_str  = "";
-long rx_micros = 0;
+long last_rx_edge_time = 0;
+int rx_edge_count = 0;
 boolean tx_data   = true;
+int last_rx_id = -1;
 
 // Searching algorithm paramters
 long last_search_time = 0;
@@ -141,6 +200,7 @@ boolean returning = false;
 long turn_arnd_time = 0;
 long finished_time  = 0;
 boolean begun = false;
+int slave_state = -1;
 
 void setup() {
   
@@ -154,9 +214,6 @@ void setup() {
   
   // Serial (for debugging)
   Serial.begin(9600);
-  
-  // Initialize Timer
-  // Timer1.initialize(50000);
   
   // Initialize and calibrate color sensor
   init_color_sensor();
@@ -184,8 +241,8 @@ void loop() {
   if(DEBUG)
     motor_duty_cycle = 0;
   
-  // Performs sensing
-  sense_color();
+  // rx listen function
+  sense_rx();
   
   // Performs state actions
   handle_state();
@@ -226,21 +283,22 @@ void set_state(int new_state)
   }
   
   // detatch the collision handler if we are tx/rx
-  else if(new_state == STATE_RX || new_state == STATE_TX)
+  else if(new_state == STATE_MASTER || new_state == STATE_SLAVE)
   {
+    
     detachInterrupt(COLLISION_INTERRUPT_NO);
   }
   
   // reattach the collision handler if we are not tx/rx
-  else if((current_state == STATE_RX || current_state == STATE_TX) 
-          && (new_state != STATE_RX && new_state != STATE_TX))
+  else if((current_state == STATE_MASTER || current_state == STATE_SLAVE) 
+          && (new_state != STATE_MASTER && new_state != STATE_SLAVE))
   {
     attachInterrupt(COLLISION_INTERRUPT_NO, handle_collision, RISING);
   }
   
   
-  // prevent collided from being last state
-  if(current_state != STATE_COLLIDED)
+  // prevent collided from being last state, or from last state being the current state
+  if(current_state != STATE_COLLIDED && current_state != new_state)
     last_state = current_state;
     
   stop_motor();
@@ -290,22 +348,18 @@ void handle_state()
     set_action(ACTION_FORWARD);
       
     // Calculate the sensed color if we havent gotten off NO_COLOR
+  
+    // set followed color to red or blue if sensed
+    int c_color = calculate_color();
     if(fol_color == NO_COLOR)
     {
-      // set followed color to red or blue if sensed
-      int c_color = calculate_color();
-      if(c_color == RED_COLOR)
-      {
-        fol_color = RED_COLOR;
-        set_state(STATE_FOL_COLOR);
-      }
-      if(c_color == BLUE_COLOR)
-      {
-        fol_color = BLUE_COLOR;
-        set_state(STATE_FOL_COLOR);
-      }
-      
+      set_fol_color(c_color);
     }
+    if(c_color == fol_color)
+    {
+      set_state(STATE_FOL_COLOR);
+    }
+      
     
   }
   if (current_state == STATE_STOPPED)
@@ -346,35 +400,64 @@ void handle_state()
     }
   }
   
-  // We are transmitting
-  if (current_state == STATE_TX)
+  // We are slave: precondition, this state was not set erroneously. We will be stuck here forever, otherwise
+  if (current_state == STATE_SLAVE)
   {
-   /* 
-    for(int i = 0; i < TX_MSG_LEN; i++)
+    // First thing we do is respond we have heard
+    if(slave_state == SLAVE_STATE_RESPOND_HEARD)
     {
-      digitalWrite(TX_PIN, !tx_msg[i]);
-      delayMicroseconds(MSG_DELAY/2);
-      Serial.print(digitalRead(RX_PIN));
-      Serial.print(" ");
-      delayMicroseconds(MSG_DELAY/2);
-    }*/
-    //Serial.println(" ");
-    /*
-    delayMicroseconds(800);
-    digitalWrite(TX_PIN, tx_data);
-    tx_data = !tx_data;*/
-    /*if(rx_micros - micros() > 1600)
-    {
-      digitalWrite(TX_PIN, tx_data);
-      tx_data = !tx_data;
-      rx_micros = 0;
+      send_TX(MSG_HEARD);
+      slave_state = SLAVE_STATE_LISTEN_MESSAGE;
     }
-
-    Serial.println(digitalRead(RX_PIN));*/
+    
+    if(slave_state == SLAVE_STATE_LISTEN_MESSAGE)
+    {
+      int response = process_RX();
+      last_rx_id = response;
+      
+      if(response == MSG_INVALID_ID)
+      {
+        slave_state = SLAVE_STATE_RESPOND_HEARD;
+      }
+      
+      if(response == MSG_FOUND_BLUE_ID)
+      {
+        slave_state = SLAVE_STATE_RESPOND_FINISHED_COMM;
+        fol_color = RED_COLOR;
+      }
+      
+      if(response == MSG_FOUND_RED_ID)
+      {
+        slave_state = SLAVE_STATE_RESPOND_FINISHED_COMM;
+        fol_color = BLUE_COLOR;
+      }
+    }
+    
+    if(slave_state == SLAVE_STATE_RESPOND_FINISHED_COMM)
+    {
+      // if we heard red, we respond red
+      if(last_rx_id == MSG_FOUND_RED_ID)
+        send_TX(MSG_FOUND_RED);
+        
+      // if we heard blue, we respond blue
+      if(last_rx_id == MSG_FOUND_BLUE_ID)
+        send_TX(MSG_FOUND_BLUE);
+        
+      // if we heard red, we respond red
+      if(last_rx_id == MSG_DONE_ID) 
+        send_TX(MSG_DONE);
+      
+      // no longer a slave
+      slave_state = -1;
+      
+      // go back to previous state
+      set_state(last_state);
+    }
+    
   }
   
   // We are recieving
-  if (current_state == STATE_RX)
+  if (current_state == STATE_MASTER)
   {
   //  Serial.println(digitalRead(RX_PIN));
   }
@@ -427,10 +510,9 @@ void handle_state()
       {
         // see color
         int c_color = calculate_color();
-        
         if(fol_color == NO_COLOR && c_color != NEUTRAL_COLOR)
           {
-            fol_color = c_color;
+            set_fol_color(c_color);
             set_state(STATE_REFIND_LINE);
           }
         else if(c_color == fol_color)
@@ -507,7 +589,7 @@ void handle_state()
       // Waits one second before accepting new collision interrupts
       if(millis() - last_collide_time > COLLISION_REFRESH_TIME && !collision_triggers_found)
       {
-        Serial.println("finding collision triggers");
+        //Serial.println("finding collision triggers");
         find_collision_triggers();
       }
   
@@ -673,18 +755,18 @@ void find_collision_triggers()
 {
   
     int c_color = calculate_color();
-    Serial.println("The bumpers detected are: {");
+   // Serial.println("The bumpers detected are: {");
     for(int i = 0; i < NUM_COLLISION_PINS; i++)
     {
       collision_states[i] = digitalRead(COLLISION_SWITCH_PINS[i]);
       if(collision_states[i])
       {
-        Serial.print(i);
-        Serial.print(" ");
+       // Serial.print(i);
+        //Serial.print(" ");
       }
     }
-    Serial.print("}");
-    Serial.println("");
+    //Serial.print("}");
+    //Serial.println("");
     collision_triggers_found = true;
     attachInterrupt(COLLISION_INTERRUPT_NO, handle_collision, RISING);
     
@@ -759,6 +841,12 @@ void respond_collision_rear()
   
 }
 
+void set_fol_color(int c_color)
+{
+  fol_color = c_color;
+  //set_state(STATE_MASTER);
+}
+
 void init_motor_control()
 {
   // Assign motor to proper pins
@@ -777,15 +865,11 @@ void init_tx_rx()
 {
   pinMode(CARRIER_PIN, OUTPUT); 
   pinMode(RX_MASK_PIN, OUTPUT);
+  pinMode(RX_INTERRUPT_PIN, INPUT);
   
   // HIGH = reading enabled, LOW = reading disabled
   digitalWrite(RX_MASK_PIN, HIGH);
-  //Serial1.begin(600);
-  
-  attachInterrupt(RX_INTERRUPT_NO, rx_isr(), RISING);
-  
-  //pinMode(TX_PIN, OUTPUT);
-  //pinMode(RX_PIN, INPUT);
+  attachInterrupt(RX_INTERRUPT_NO, rx_isr, RISING);
  
   TCCR3A = _BV(COM3A0) | _BV(COM3B0) | _BV(WGM30) | _BV(WGM31);
   // sets COM Output Mode to FastPWM with toggle of OC3A on compare match with OCR3A
@@ -811,6 +895,8 @@ void init_collision_detector()
 void init_color_sensor()
 {
    // Establish color params
+  Timer1.initialize(50000);
+  
   pinMode(RED_LED_PIN, OUTPUT);
   pinMode(BLUE_LED_PIN, OUTPUT);
   
@@ -833,19 +919,62 @@ void init_color_sensor()
     temp_offset = color_diff;
   }
   calib_offset = temp_offset;
-  // Timer1.attachInterrupt(flash);
+  Timer1.attachInterrupt(flash);
 }
 
-void sense_color()
-{
-  if(millis() - last_sense_time > LED_FLASH_PERIOD) 
-  {
-    flash();
-    last_sense_time = millis();
+void rx_isr() {
+  detachInterrupt(RX_INTERRUPT_NO);
+  rx_edge_count++;
+  last_rx_edge_time = micros();
+  
+}
+
+void sense_rx(){
+      
+    if(rx_edge_count > 0)
+    {   
+       
+    // if we waited longer than one millisecond between each edge
+    if(micros() - last_rx_edge_time > RX_EDGE_TIMEOUT)
+    {
+      // reset edge coun
+      rx_edge_count = 0;
+    }
+    
+    // If the number of edges is sufficient to assume we have heard the "HELLO" signal
+    else if (rx_edge_count >= RX_EDGE_COUNT_MIN)
+    {
+      rx_edge_count = 0;
+      set_state(STATE_SLAVE);
+      slave_state = SLAVE_STATE_RESPOND_HEARD;
+      Serial.println("This is probably a message.");
+    }
+    
+    attachInterrupt(RX_INTERRUPT_NO, rx_isr, RISING);
+    }
+}
+ 
+int process_RX(){
+  float num_ones = 0;
+  for (int i=0; i<MSG_LEN; i++) {
+    num_ones += digitalRead(RX_INTERRUPT_PIN);
   }
+  
+  float percentage = (2*num_ones)/(MSG_LEN)*10;
+  return MSG_LIST[round(percentage)];
+  
 }
 
-rx_isr() {
-  set_state(STATE_RX);
+void send_TX(const boolean message[]) {
+  for (int i=0; i<MSG_LEN; i++) {
+    digitalWrite(TX_PIN, message[i]);
+    delayMicroseconds(MSG_DELAY);
+    digitalWrite(TX_PIN, LOW);
+    delayMicroseconds(MSG_DELAY);
+  }
+    
 }
+
+  
+
 
