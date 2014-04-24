@@ -7,7 +7,7 @@
 #define LCD_PIN 31
 #define NO_COLOR -10
 
-#define DEBUG 0
+#define DEBUG 1
 
 /************************
   *  Authors: Sam Z     *
@@ -79,13 +79,14 @@ const int FOUND_RED  = 0;
 const int FOUND_BLUE = 1;
 const int HEARD_YOU  = 2;
 const int MSG_DELAY = 800; //us
+const int MSG_DURATION_MILLIS = 80; //ms
 const int MSG_LEN = 50; //bits
 const int TX_PIN = 18;
 const int RX_MASK_PIN = 33;
 const int RX_INTERRUPT_PIN = 19;
 const int RX_INTERRUPT_NO = 4;
-const int RX_EDGE_COUNT_MIN = 2; // edges
-const int RX_EDGE_TIMEOUT = 1000; // us 
+const int RX_EDGE_COUNT_MIN = 5; // edges
+const int RX_EDGE_TIMEOUT = 3000; // us 
 
 // Slave states
 const int SLAVE_STATE_LISTEN_MESSAGE           = 0;
@@ -201,6 +202,7 @@ long turn_arnd_time = 0;
 long finished_time  = 0;
 boolean begun = false;
 int slave_state = -1;
+boolean begin_sample_rx = false;
 
 void setup() {
   
@@ -242,7 +244,8 @@ void loop() {
     motor_duty_cycle = 0;
   
   // rx listen function
-  sense_rx();
+  if(begun)
+    sense_rx();
   
   // Performs state actions
   handle_state();
@@ -311,14 +314,13 @@ void set_action(int new_action)
 {
   if(current_action != new_action)
   {
-    lcd.empty();
-    lcd.at(0,3,STATE_STRINGS[current_state]);
-    lcd.at(1,3,ACTION_STRINGS[new_action]);
     
     // prevent shoot-through, set action
     stop_motor();
     delay(STATE_CHANGE_DELAY);
     current_action = new_action; 
+    
+    update_lcd();
   }
 }
 
@@ -351,7 +353,7 @@ void handle_state()
   
     // set followed color to red or blue if sensed
     int c_color = calculate_color();
-    if(fol_color == NO_COLOR)
+    if(fol_color == NO_COLOR && c_color != NEUTRAL_COLOR)
     {
       set_fol_color(c_color);
     }
@@ -394,6 +396,7 @@ void handle_state()
           last_search_time = millis();
         else{
           set_state(STATE_DONE);
+          set_action(ACTION_STOPPED);
           finished_time = millis();
         }
       }
@@ -424,12 +427,14 @@ void handle_state()
       {
         slave_state = SLAVE_STATE_RESPOND_FINISHED_COMM;
         fol_color = RED_COLOR;
+        Serial.println("OTHER BOT FOUND BLUE");
       }
       
       if(response == MSG_FOUND_RED_ID)
       {
         slave_state = SLAVE_STATE_RESPOND_FINISHED_COMM;
         fol_color = BLUE_COLOR;
+        Serial.println("OTHER BOT FOUND RED");
       }
     }
     
@@ -451,7 +456,7 @@ void handle_state()
       slave_state = -1;
       
       // go back to previous state
-      set_state(last_state);
+      set_state(STATE_DONE);
     }
     
   }
@@ -926,42 +931,51 @@ void rx_isr() {
   detachInterrupt(RX_INTERRUPT_NO);
   rx_edge_count++;
   last_rx_edge_time = micros();
-  
+  begin_sample_rx = true;
+  attachInterrupt(RX_INTERRUPT_NO, rx_isr, RISING);
 }
 
 void sense_rx(){
       
     if(rx_edge_count > 0)
     {   
+     
+      // if we waited longer than one millisecond between each edge
+      if(micros() - last_rx_edge_time > RX_EDGE_TIMEOUT)
+      {
+        // reset edge counter
+         rx_edge_count = 0;
+      }
+      
+      // If the number of edges is sufficient to assume we have heard the "HELLO" signal
+      else if (rx_edge_count >= RX_EDGE_COUNT_MIN && current_state != STATE_SLAVE)
+      {
        
-    // if we waited longer than one millisecond between each edge
-    if(micros() - last_rx_edge_time > RX_EDGE_TIMEOUT)
-    {
-      // reset edge coun
-      rx_edge_count = 0;
+        rx_edge_count = 0;
+        set_state(STATE_SLAVE);
+        update_lcd();
+        slave_state = SLAVE_STATE_RESPOND_HEARD;
+      }
     }
-    
-    // If the number of edges is sufficient to assume we have heard the "HELLO" signal
-    else if (rx_edge_count >= RX_EDGE_COUNT_MIN)
-    {
-      rx_edge_count = 0;
-      set_state(STATE_SLAVE);
-      slave_state = SLAVE_STATE_RESPOND_HEARD;
-      Serial.println("This is probably a message.");
-    }
-    
-    attachInterrupt(RX_INTERRUPT_NO, rx_isr, RISING);
-    }
+
 }
  
 int process_RX(){
-  float num_ones = 0;
-  for (int i=0; i<MSG_LEN; i++) {
-    num_ones += digitalRead(RX_INTERRUPT_PIN);
+  if(begin_sample_rx)
+  {
+    rx_edge_count = 0;
+    long time_elapsed = millis();
+    while(millis() - time_elapsed < (MSG_DURATION_MILLIS))
+    {
+     // allow the interrupt to collect for the message duration time  
+    }
+    begin_sample_rx = false;
+    Serial.println(rx_edge_count);
+    float percentage = (float)(rx_edge_count)/(MSG_LEN)*10;
+    return MSG_LIST[round(percentage)];
   }
-  
-  float percentage = (2*num_ones)/(MSG_LEN)*10;
-  return MSG_LIST[round(percentage)];
+  // invalid
+  return 10;
   
 }
 
@@ -975,6 +989,12 @@ void send_TX(const boolean message[]) {
     
 }
 
-  
+void update_lcd()
+{
+  lcd.empty();
+  lcd.at(0,3,STATE_STRINGS[current_state]);
+  lcd.at(1,3,ACTION_STRINGS[current_action]);
+}
+
 
 
