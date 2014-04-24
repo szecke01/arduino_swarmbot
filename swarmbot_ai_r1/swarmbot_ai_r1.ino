@@ -87,6 +87,7 @@ const int RX_INTERRUPT_PIN = 19;
 const int RX_INTERRUPT_NO = 4;
 const int RX_EDGE_COUNT_MIN = 5; // edges
 const int RX_EDGE_TIMEOUT = 3000; // us 
+const int TX_TIMEOUT_ATTEMPTS = 3;
 
 // Slave states
 const int SLAVE_STATE_LISTEN_MESSAGE           = 0;
@@ -201,8 +202,9 @@ boolean returning = false;
 long turn_arnd_time = 0;
 long finished_time  = 0;
 boolean begun = false;
-int slave_state = -1;
+int tx_state = -1;
 boolean begin_sample_rx = false;
+int num_tx_timeouts = 0;
 
 void setup() {
   
@@ -244,7 +246,7 @@ void loop() {
     motor_duty_cycle = 0;
   
   // rx listen function
-  if(begun)
+  if(current_state == STATE_SEARCHING)
     sense_rx();
   
   // Performs state actions
@@ -319,8 +321,8 @@ void set_action(int new_action)
     stop_motor();
     delay(STATE_CHANGE_DELAY);
     current_action = new_action; 
-    
     update_lcd();
+    
   }
 }
 
@@ -357,7 +359,7 @@ void handle_state()
     {
       set_fol_color(c_color);
     }
-    if(c_color == fol_color)
+    if(c_color == fol_color && current_state != STATE_MASTER)
     {
       set_state(STATE_FOL_COLOR);
     }
@@ -396,7 +398,6 @@ void handle_state()
           last_search_time = millis();
         else{
           set_state(STATE_DONE);
-          set_action(ACTION_STOPPED);
           finished_time = millis();
         }
       }
@@ -407,38 +408,38 @@ void handle_state()
   if (current_state == STATE_SLAVE)
   {
     // First thing we do is respond we have heard
-    if(slave_state == SLAVE_STATE_RESPOND_HEARD)
+    if(tx_state == SLAVE_STATE_RESPOND_HEARD)
     {
       send_TX(MSG_HEARD);
-      slave_state = SLAVE_STATE_LISTEN_MESSAGE;
+      tx_state = SLAVE_STATE_LISTEN_MESSAGE;
     }
     
-    if(slave_state == SLAVE_STATE_LISTEN_MESSAGE)
+    if(tx_state == SLAVE_STATE_LISTEN_MESSAGE)
     {
       int response = process_RX();
       last_rx_id = response;
       
       if(response == MSG_INVALID_ID)
       {
-        slave_state = SLAVE_STATE_RESPOND_HEARD;
+        tx_state = SLAVE_STATE_RESPOND_HEARD;
       }
       
       if(response == MSG_FOUND_BLUE_ID)
       {
-        slave_state = SLAVE_STATE_RESPOND_FINISHED_COMM;
+        tx_state = SLAVE_STATE_RESPOND_FINISHED_COMM;
         fol_color = RED_COLOR;
         Serial.println("OTHER BOT FOUND BLUE");
       }
       
       if(response == MSG_FOUND_RED_ID)
       {
-        slave_state = SLAVE_STATE_RESPOND_FINISHED_COMM;
+        tx_state = SLAVE_STATE_RESPOND_FINISHED_COMM;
         fol_color = BLUE_COLOR;
         Serial.println("OTHER BOT FOUND RED");
       }
     }
     
-    if(slave_state == SLAVE_STATE_RESPOND_FINISHED_COMM)
+    if(tx_state == SLAVE_STATE_RESPOND_FINISHED_COMM)
     {
       // if we heard red, we respond red
       if(last_rx_id == MSG_FOUND_RED_ID)
@@ -453,7 +454,7 @@ void handle_state()
         send_TX(MSG_DONE);
       
       // no longer a slave
-      slave_state = -1;
+      tx_state = -1;
       
       // go back to previous state
       set_state(STATE_DONE);
@@ -464,7 +465,75 @@ void handle_state()
   // We are recieving
   if (current_state == STATE_MASTER)
   {
-  //  Serial.println(digitalRead(RX_PIN));
+    send_TX(MSG_HELLO);
+    
+     // First thing we do is respond we have heard
+    if(tx_state == MASTER_STATE_BEGIN_HANDSHAKE)
+    {
+      send_TX(MSG_HELLO);
+      tx_state = MASTER_STATE_RECIEVE_HANDSHAKE;
+      delay(100);
+    }
+    
+    if(tx_state == MASTER_STATE_RECIEVE_HANDSHAKE)
+    {
+      int response = process_RX();
+      last_rx_id = response;
+      
+      // go back!
+      if(response == MSG_INVALID_ID)
+      {
+        tx_state = MASTER_STATE_BEGIN_HANDSHAKE;
+      }
+      
+      // keep going
+      if(response == MSG_HEARD_ID)
+      {
+        tx_state = MASTER_STATE_TRANSMIT_COLOR;
+      }
+      
+    }
+    
+    if(tx_state == MASTER_STATE_TRANSMIT_COLOR)
+    {
+      // if we found red, say red
+      if(fol_color == BLUE_COLOR)
+      {
+        send_TX(MSG_FOUND_BLUE);
+      }
+      
+      // if we found blue, say blue
+      if(fol_color == RED_COLOR)
+      {
+        send_TX(MSG_FOUND_RED);
+      }
+      
+      delay(100);
+      tx_state = MASTER_STATE_CONFIRM_TRANSMIT;
+      
+    }
+    
+    if(tx_state == MASTER_STATE_CONFIRM_TRANSMIT)
+    {
+      int response = process_RX();
+      last_rx_id = response;
+      
+      // go back!
+      if(response == MSG_INVALID_ID)
+      {
+        tx_state = MASTER_STATE_TRANSMIT_COLOR;
+        num_tx_timeouts++;
+      }
+      
+      // we've timed out on this, give up
+      if(num_tx_timeouts > TX_TIMEOUT_ATTEMPTS || response != MSG_INVALID_ID)
+      {
+        // Otherwise, we're done rx/tx
+        set_state(STATE_REFIND_LINE);
+      }
+    }
+    
+    
   }
   
   // Turn around after hitting end
@@ -485,11 +554,11 @@ void handle_state()
   
   if (current_state == STATE_DONE)
   {
-    if(millis() - finished_time < 200)
+    if(millis() - finished_time < 400)
        set_action(ACTION_REVERSE);
-    else if(millis() - finished_time < 200 + 600)
+    else if(millis() - finished_time < 400 + 800)
        set_action(ACTION_PIVOT_CW);
-    else if(millis() - finished_time < 200 + 600 + 200)
+    else if(millis() - finished_time < 400 + 800 + 500)
        set_action(ACTION_REVERSE);
     else{
         set_action(ACTION_STOPPED);
@@ -517,8 +586,8 @@ void handle_state()
         int c_color = calculate_color();
         if(fol_color == NO_COLOR && c_color != NEUTRAL_COLOR)
           {
-            set_fol_color(c_color);
             set_state(STATE_REFIND_LINE);
+            set_fol_color(c_color);
           }
         else if(c_color == fol_color)
         {
@@ -849,7 +918,7 @@ void respond_collision_rear()
 void set_fol_color(int c_color)
 {
   fol_color = c_color;
-  //set_state(STATE_MASTER);
+  set_state(STATE_MASTER);
 }
 
 void init_motor_control()
@@ -862,8 +931,6 @@ void init_motor_control()
   
   // Set duty cycle to desired speed
   motor_duty_cycle = .32;  
-  
-
 }
 
 void init_tx_rx()
@@ -950,11 +1017,11 @@ void sense_rx(){
       // If the number of edges is sufficient to assume we have heard the "HELLO" signal
       else if (rx_edge_count >= RX_EDGE_COUNT_MIN && current_state != STATE_SLAVE)
       {
-       
         rx_edge_count = 0;
         set_state(STATE_SLAVE);
+        set_action(ACTION_STOPPED);
         update_lcd();
-        slave_state = SLAVE_STATE_RESPOND_HEARD;
+        tx_state = SLAVE_STATE_RESPOND_HEARD;
       }
     }
 
