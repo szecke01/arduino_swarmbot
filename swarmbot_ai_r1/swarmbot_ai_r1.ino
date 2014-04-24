@@ -7,7 +7,8 @@
 #define LCD_PIN 31
 #define NO_COLOR -10
 
-#define DEBUG 1
+#define DEBUG 0
+#define COMMUNICATE 0
 
 /************************
   *  Authors: Sam Z     *
@@ -93,6 +94,12 @@ const int TX_TIMEOUT_ATTEMPTS = 3;
 const int SLAVE_STATE_LISTEN_MESSAGE           = 0;
 const int SLAVE_STATE_RESPOND_HEARD            = 1;
 const int SLAVE_STATE_RESPOND_FINISHED_COMM    = 2;
+
+// Master states
+const int MASTER_STATE_BEGIN_HANDSHAKE = 0;
+const int MASTER_STATE_RECIEVE_HANDSHAKE = 1;
+const int MASTER_STATE_TRANSMIT_COLOR = 2;
+const int MASTER_STATE_CONFIRM_TRANSMIT = 3;
 
 
 // Message IDs
@@ -382,12 +389,12 @@ void handle_state()
     
     else
     {
-      if(millis() - last_search_time < 1100)
+      if(millis() - last_search_time < 850)
       {
         // Turn clockwise
         set_action(ACTION_PIVOT_CW);
       }
-      else if(millis() - last_search_time < 1100 + 2200)
+      else if(millis() - last_search_time < 850 + 1800)
       {
         // Turn counter-clockwise
         set_action(ACTION_PIVOT_CCW);
@@ -465,12 +472,12 @@ void handle_state()
   // We are recieving
   if (current_state == STATE_MASTER)
   {
-    send_TX(MSG_HELLO);
+    //send_TX(MSG_HELLO);
     
      // First thing we do is respond we have heard
     if(tx_state == MASTER_STATE_BEGIN_HANDSHAKE)
     {
-      send_TX(MSG_HELLO);
+      send_TX(MSG_FOUND_BLUE);
       tx_state = MASTER_STATE_RECIEVE_HANDSHAKE;
       delay(100);
     }
@@ -918,7 +925,12 @@ void respond_collision_rear()
 void set_fol_color(int c_color)
 {
   fol_color = c_color;
+  /*
+  // DEBUG, DON'T COMMUNICATE
+  if(COMMUNICATE){
   set_state(STATE_MASTER);
+  tx_state = MASTER_STATE_BEGIN_HANDSHAKE;
+  }*/
 }
 
 void init_motor_control()
@@ -1017,11 +1029,13 @@ void sense_rx(){
       // If the number of edges is sufficient to assume we have heard the "HELLO" signal
       else if (rx_edge_count >= RX_EDGE_COUNT_MIN && current_state != STATE_SLAVE)
       {
+        /*
         rx_edge_count = 0;
         set_state(STATE_SLAVE);
         set_action(ACTION_STOPPED);
         update_lcd();
         tx_state = SLAVE_STATE_RESPOND_HEARD;
+        */
       }
     }
 
@@ -1047,6 +1061,7 @@ int process_RX(){
 }
 
 void send_TX(const boolean message[]) {
+  
   for (int i=0; i<MSG_LEN; i++) {
     digitalWrite(TX_PIN, message[i]);
     delayMicroseconds(MSG_DELAY);
@@ -1062,6 +1077,3 @@ void update_lcd()
   lcd.at(0,3,STATE_STRINGS[current_state]);
   lcd.at(1,3,ACTION_STRINGS[current_action]);
 }
-
-
-
