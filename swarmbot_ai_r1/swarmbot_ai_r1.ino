@@ -425,6 +425,7 @@ void handle_state()
       Serial.println("Responding HEARD!");
       send_TX(MSG_HEARD);
       tx_state = SLAVE_STATE_LISTEN_MESSAGE;
+      delay(100);
     }
     
     if(tx_state == SLAVE_STATE_LISTEN_MESSAGE)
@@ -433,10 +434,10 @@ void handle_state()
       int response = process_RX();
       // Listen for 300 milliseconds, or until you've heard a real response
       int time_elapsed = millis();
-      /*while(response == MSG_INVALID_ID && time_elapsed < 300)
+      while(response == MSG_INVALID_ID && time_elapsed < 300)
       {
         response = process_RX();
-      }*/
+      }
       last_rx_id = response;
       
       if(response == MSG_INVALID_ID)
@@ -446,39 +447,17 @@ void handle_state()
       
       if(response == MSG_FOUND_BLUE_ID)
       {
-        tx_state = SLAVE_STATE_RESPOND_FINISHED_COMM;
         fol_color = RED_COLOR;
+        set_state(STATE_SEARCHING);
       }
       
       if(response == MSG_FOUND_RED_ID)
       {
         tx_state = SLAVE_STATE_RESPOND_FINISHED_COMM;
-        fol_color = BLUE_COLOR;
+        set_state(STATE_SEARCHING);
       }
     }
-    
-    if(tx_state == SLAVE_STATE_RESPOND_FINISHED_COMM)
-    {
-      Serial.println("Finished Communication");
-      // if we heard red, we respond red
-      if(last_rx_id == MSG_FOUND_RED_ID)
-        send_TX(MSG_FOUND_RED);
-        
-      // if we heard blue, we respond blue
-      if(last_rx_id == MSG_FOUND_BLUE_ID)
-        send_TX(MSG_FOUND_BLUE);
-        
-      // if we heard red, we respond red
-      if(last_rx_id == MSG_DONE_ID) 
-        send_TX(MSG_DONE);
-      
-      // no longer a slave
-      tx_state = -1;
-      
-      // go back to previous state
-      set_state(STATE_DONE);
-    }
-    
+
     
   }
   
@@ -525,51 +504,27 @@ void handle_state()
     {
       Serial.println("TRANSMITTING COLOR");
       // if we found red, say red
-      if(fol_color == BLUE_COLOR)
-      {
-        send_TX(MSG_FOUND_BLUE);
-      }
       
-      // if we found blue, say blue
-      if(fol_color == RED_COLOR)
+      for(int i = 0; i < 5; i++)
       {
-        send_TX(MSG_FOUND_RED);
+        if(fol_color == BLUE_COLOR)
+        {
+          send_TX(MSG_FOUND_BLUE);
+        }
+        
+        // if we found blue, say blue
+        if(fol_color == RED_COLOR)
+        {
+          send_TX(MSG_FOUND_RED);
+        }
       }
       
       delay(100);
-      tx_state = MASTER_STATE_CONFIRM_TRANSMIT;
+      set_state(STATE_REFIND_LINE);
       
     }
     
-    if(tx_state == MASTER_STATE_CONFIRM_TRANSMIT)
-    {
-      Serial.println("AWAITING CONFIRMATION");
-      // New hotness for recieving messages w/ delay
-      int response = process_RX();
-      
-      // Listen for 300 milliseconds, or until you've heard a real response
-      long time_elapsed = millis();
-      while(response == MSG_INVALID_ID && time_elapsed < 300)
-      {
-        response = process_RX();
-      }
-      last_rx_id = response;
-      
-      // go back!
-      if(response == MSG_INVALID_ID)
-      {
-        tx_state = MASTER_STATE_TRANSMIT_COLOR;
-        num_tx_timeouts++;
-      }
-      
-      // we've timed out on this, give up
-      if(num_tx_timeouts > TX_TIMEOUT_ATTEMPTS || response == MSG_FOUND_BLUE_ID || response == MSG_FOUND_RED_ID)
-      {
-        // Otherwise, we're done rx/tx
-        set_state(STATE_REFIND_LINE);
-        
-      }
-    }
+    
     
     
   }
