@@ -7,8 +7,8 @@
 #define LCD_PIN 31
 #define NO_COLOR -10
 
-#define DEBUG 0
-#define COMMUNICATE 0
+#define DEBUG 1
+
 
 /************************
   *  Authors: Sam Z     *
@@ -86,9 +86,9 @@ const int TX_PIN = 18;
 const int RX_MASK_PIN = 33;
 const int RX_INTERRUPT_PIN = 19;
 const int RX_INTERRUPT_NO = 4;
-const int RX_EDGE_COUNT_MIN = 5; // edges
-const int RX_EDGE_TIMEOUT = 3000; // us 
-const int TX_TIMEOUT_ATTEMPTS = 3;
+const int RX_EDGE_COUNT_MIN = 3; // edges
+const int RX_EDGE_TIMEOUT = 3; // us 
+const int TX_TIMEOUT_ATTEMPTS = 7;
 
 // Slave states
 const int SLAVE_STATE_LISTEN_MESSAGE           = 0;
@@ -108,7 +108,7 @@ const int MSG_HEARD_ID           = 1;
 const int MSG_FOUND_BLUE_ID      = 2;
 const int MSG_FOUND_RED_ID       = 3;
 const int MSG_DONE_ID            = 4;
-const int MSG_INVALID_ID    = 5;
+const int MSG_INVALID_ID         = 5;
 
 const int MSG_LIST[] = { MSG_INVALID_ID, MSG_HEARD_ID, MSG_INVALID_ID, MSG_FOUND_BLUE_ID, MSG_INVALID_ID, MSG_FOUND_RED_ID, MSG_INVALID_ID, MSG_DONE_ID, MSG_INVALID_ID, MSG_INVALID_ID, MSG_INVALID_ID};
 
@@ -118,30 +118,30 @@ const boolean MSG_HELLO[]      = {1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
                               1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
                               1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
                               1, 1, 1, 1, 1, 1, 1, 1, 1, 1};
-                         
-const boolean MSG_HEARD[]      = {1, 1, 1, 1, 1, 0, 0, 0, 0, 0,
-                              0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
-                              0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
-                              0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
-                              0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 
-const boolean MSG_FOUND_BLUE[] = {1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-                              1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 
-                              0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
-                              0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
-                              0, 0, 0, 0, 0, 0, 0, 0, 0, 0};            
-
-const boolean MSG_FOUND_RED[]  = {1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-                              1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 
-                              1, 1, 1, 1, 1, 0, 0, 0, 0, 0,  
-                              0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
-                              0, 0, 0, 0, 0, 0, 0, 0, 0, 0};      
-    
-const boolean MSG_DONE[]       = {1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+const boolean MSG_HEARD[]      = {1, 0, 0 ,0, 0, 0, 0, 0, 0, 0,
+                              1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
+                              1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
+                              1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
+                              1, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+//15 1's
+const boolean MSG_FOUND_BLUE[] = {1, 0, 0, 0, 0, 1, 0, 0, 0, 0,
+                              1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 
+                              0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 
+                              0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 
+                              1, 0, 0, 1, 0, 0, 1, 0, 0, 0};            
+//25 1's
+const boolean MSG_FOUND_RED[]  = {1, 0, 1, 0, 1, 0, 1, 0, 1, 0,
+                              1, 0, 1, 0, 1, 0, 1, 0, 1, 0,
+                              1, 0, 1, 0, 1, 0, 1, 0, 1, 0,
+                              1, 0, 1, 0, 1, 0, 1, 0, 1, 0,
+                              1, 0, 1, 0, 1, 0, 1, 0, 1, 0};       
+//35 1's    
+const boolean MSG_DONE[]       = {1, 0, 1, 0, 1, 0, 1, 0, 1, 0,
                               1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 
                               1, 1, 1, 1, 1, 1, 1, 1, 1, 1,  
-                              1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 
-                              0, 0, 0, 0, 0, 0, 0, 0, 0, 0};                            
+                              1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 
+                              1, 0, 1, 0, 1, 0, 1, 0, 1, 0};            
 
 // if recieved message is this, it is invalid
 const int MSG_RCVD_INVALID[]      = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -254,12 +254,17 @@ void loop() {
   
   // rx listen function
   if(current_state == STATE_SEARCHING)
-    sense_rx();
+  sense_rx();
   
+  
+  //send_TX(MSG_HELLO);
   // Performs state actions
   handle_state();
   handle_action();
  
+ 
+ send_TX(MSG_DONE);
+ delay(300);
 }
 
 // Sets state and gives delay
@@ -417,13 +422,21 @@ void handle_state()
     // First thing we do is respond we have heard
     if(tx_state == SLAVE_STATE_RESPOND_HEARD)
     {
+      Serial.println("Responding HEARD!");
       send_TX(MSG_HEARD);
       tx_state = SLAVE_STATE_LISTEN_MESSAGE;
     }
     
     if(tx_state == SLAVE_STATE_LISTEN_MESSAGE)
     {
+      Serial.println("Awaiting message");
       int response = process_RX();
+      // Listen for 300 milliseconds, or until you've heard a real response
+      int time_elapsed = millis();
+      /*while(response == MSG_INVALID_ID && time_elapsed < 300)
+      {
+        response = process_RX();
+      }*/
       last_rx_id = response;
       
       if(response == MSG_INVALID_ID)
@@ -435,19 +448,18 @@ void handle_state()
       {
         tx_state = SLAVE_STATE_RESPOND_FINISHED_COMM;
         fol_color = RED_COLOR;
-        Serial.println("OTHER BOT FOUND BLUE");
       }
       
       if(response == MSG_FOUND_RED_ID)
       {
         tx_state = SLAVE_STATE_RESPOND_FINISHED_COMM;
         fol_color = BLUE_COLOR;
-        Serial.println("OTHER BOT FOUND RED");
       }
     }
     
     if(tx_state == SLAVE_STATE_RESPOND_FINISHED_COMM)
     {
+      Serial.println("Finished Communication");
       // if we heard red, we respond red
       if(last_rx_id == MSG_FOUND_RED_ID)
         send_TX(MSG_FOUND_RED);
@@ -467,28 +479,36 @@ void handle_state()
       set_state(STATE_DONE);
     }
     
+    
   }
   
   // We are recieving
   if (current_state == STATE_MASTER)
   {
-    //send_TX(MSG_HELLO);
     
-     // First thing we do is respond we have heard
+     // First thing we do is say we found something
     if(tx_state == MASTER_STATE_BEGIN_HANDSHAKE)
     {
-      send_TX(MSG_FOUND_BLUE);
+      Serial.println("BEGIN HANDSHAKE");
+      send_TX(MSG_HELLO);
       tx_state = MASTER_STATE_RECIEVE_HANDSHAKE;
-      delay(100);
     }
     
     if(tx_state == MASTER_STATE_RECIEVE_HANDSHAKE)
     {
+      Serial.println("AWAITING HANDSHAKE");
       int response = process_RX();
-      last_rx_id = response;
       
+      // Listen for 500 milliseconds, or until you've heard a real response
+      long time_elapsed = millis();
+      while(response != MSG_HEARD_ID && time_elapsed < 300)
+      {
+        response = process_RX();
+      }
+      last_rx_id = response;
+  
       // go back!
-      if(response == MSG_INVALID_ID)
+      if(response != MSG_HEARD_ID)
       {
         tx_state = MASTER_STATE_BEGIN_HANDSHAKE;
       }
@@ -503,6 +523,7 @@ void handle_state()
     
     if(tx_state == MASTER_STATE_TRANSMIT_COLOR)
     {
+      Serial.println("TRANSMITTING COLOR");
       // if we found red, say red
       if(fol_color == BLUE_COLOR)
       {
@@ -522,7 +543,16 @@ void handle_state()
     
     if(tx_state == MASTER_STATE_CONFIRM_TRANSMIT)
     {
+      Serial.println("AWAITING CONFIRMATION");
+      // New hotness for recieving messages w/ delay
       int response = process_RX();
+      
+      // Listen for 300 milliseconds, or until you've heard a real response
+      long time_elapsed = millis();
+      while(response == MSG_INVALID_ID && time_elapsed < 300)
+      {
+        response = process_RX();
+      }
       last_rx_id = response;
       
       // go back!
@@ -533,10 +563,11 @@ void handle_state()
       }
       
       // we've timed out on this, give up
-      if(num_tx_timeouts > TX_TIMEOUT_ATTEMPTS || response != MSG_INVALID_ID)
+      if(num_tx_timeouts > TX_TIMEOUT_ATTEMPTS || response == MSG_FOUND_BLUE_ID || response == MSG_FOUND_RED_ID)
       {
         // Otherwise, we're done rx/tx
         set_state(STATE_REFIND_LINE);
+        
       }
     }
     
@@ -579,7 +610,6 @@ void handle_state()
     if(!begun)
     {
       begun = true;
-      delay(100);
       attachInterrupt(COLLISION_INTERRUPT_NO, handle_collision, RISING);
       set_state(STATE_SEARCHING); 
     }
@@ -925,12 +955,13 @@ void respond_collision_rear()
 void set_fol_color(int c_color)
 {
   fol_color = c_color;
-  /*
-  // DEBUG, DON'T COMMUNICATE
-  if(COMMUNICATE){
-  set_state(STATE_MASTER);
-  tx_state = MASTER_STATE_BEGIN_HANDSHAKE;
-  }*/
+  
+  if(current_state != STATE_MASTER && current_state != STATE_SLAVE)
+  {
+    set_state(STATE_MASTER);
+    tx_state = MASTER_STATE_BEGIN_HANDSHAKE;
+  }
+  
 }
 
 void init_motor_control()
@@ -1009,33 +1040,31 @@ void init_color_sensor()
 void rx_isr() {
   detachInterrupt(RX_INTERRUPT_NO);
   rx_edge_count++;
-  last_rx_edge_time = micros();
+  last_rx_edge_time = millis();
   begin_sample_rx = true;
   attachInterrupt(RX_INTERRUPT_NO, rx_isr, RISING);
 }
 
 void sense_rx(){
-      
+    
     if(rx_edge_count > 0)
     {   
      
       // if we waited longer than one millisecond between each edge
-      if(micros() - last_rx_edge_time > RX_EDGE_TIMEOUT)
+      if(millis() - last_rx_edge_time > 3)
       {
         // reset edge counter
          rx_edge_count = 0;
       }
       
       // If the number of edges is sufficient to assume we have heard the "HELLO" signal
-      else if (rx_edge_count >= RX_EDGE_COUNT_MIN && current_state != STATE_SLAVE)
+      else if (rx_edge_count >= RX_EDGE_COUNT_MIN)
       {
-        /*
         rx_edge_count = 0;
         set_state(STATE_SLAVE);
         set_action(ACTION_STOPPED);
         update_lcd();
         tx_state = SLAVE_STATE_RESPOND_HEARD;
-        */
       }
     }
 
@@ -1045,12 +1074,9 @@ int process_RX(){
   if(begin_sample_rx)
   {
     rx_edge_count = 0;
-    long time_elapsed = millis();
-    while(millis() - time_elapsed < (MSG_DURATION_MILLIS))
-    {
-     // allow the interrupt to collect for the message duration time  
-    }
+    pass_time(MSG_DURATION_MILLIS);
     begin_sample_rx = false;
+    rx_edge_count++;
     Serial.println(rx_edge_count);
     float percentage = (float)(rx_edge_count)/(MSG_LEN)*10;
     return MSG_LIST[round(percentage)];
@@ -1069,6 +1095,15 @@ void send_TX(const boolean message[]) {
     delayMicroseconds(MSG_DELAY);
   }
     
+}
+
+void pass_time(long time_to_waste)
+{
+    long time_elapsed = millis();
+    while(millis() - time_elapsed < time_to_waste)
+    {
+     // allow time to pass w/ interrupts actually working
+    }
 }
 
 void update_lcd()
