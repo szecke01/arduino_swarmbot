@@ -450,12 +450,12 @@ void handle_state()
         fol_color = RED_COLOR;
         set_state(STATE_SEARCHING);
       }
-      
-      if(response == MSG_FOUND_RED_ID)
+      else
       {
-        tx_state = SLAVE_STATE_RESPOND_FINISHED_COMM;
+        fol_color = BLUE_COLOR;
         set_state(STATE_SEARCHING);
       }
+      
     }
 
     
