@@ -253,8 +253,8 @@ void loop() {
     motor_duty_cycle = 0;
   
   // rx listen function
-  if(current_state == STATE_SEARCHING)
-  sense_rx();
+  if(current_state == STATE_SEARCHING && fol_color == NO_COLOR)
+    sense_rx();
   
   
   //send_TX(MSG_HELLO);
@@ -263,8 +263,6 @@ void loop() {
   handle_action();
  
  
- send_TX(MSG_DONE);
- delay(300);
 }
 
 // Sets state and gives delay
@@ -367,6 +365,7 @@ void handle_state()
   
     // set followed color to red or blue if sensed
     int c_color = calculate_color();
+    //Serial.println(c_color);
     if(fol_color == NO_COLOR && c_color != NEUTRAL_COLOR)
     {
       set_fol_color(c_color);
@@ -440,20 +439,25 @@ void handle_state()
       }
       last_rx_id = response;
       
-      if(response == MSG_INVALID_ID)
+      if(response != MSG_FOUND_BLUE_ID && response != MSG_FOUND_RED_ID)
       {
         tx_state = SLAVE_STATE_RESPOND_HEARD;
+        return;
       }
       
       if(response == MSG_FOUND_BLUE_ID)
       {
+        Serial.println("I'll find red");
         fol_color = RED_COLOR;
         set_state(STATE_SEARCHING);
+        return;
       }
       else
       {
+        Serial.println("I'll find blue");
         fol_color = BLUE_COLOR;
         set_state(STATE_SEARCHING);
+        return;
       }
       
     }
@@ -523,9 +527,6 @@ void handle_state()
       set_state(STATE_REFIND_LINE);
       
     }
-    
-    
-    
     
   }
   
@@ -1016,6 +1017,7 @@ void sense_rx(){
       else if (rx_edge_count >= RX_EDGE_COUNT_MIN)
       {
         rx_edge_count = 0;
+        Serial.println("SETTING STATE TO SLAVE");
         set_state(STATE_SLAVE);
         set_action(ACTION_STOPPED);
         update_lcd();
@@ -1032,7 +1034,7 @@ int process_RX(){
     pass_time(MSG_DURATION_MILLIS);
     begin_sample_rx = false;
     rx_edge_count++;
-    Serial.println(rx_edge_count);
+    //Serial.println(rx_edge_count);
     float percentage = (float)(rx_edge_count)/(MSG_LEN)*10;
     return MSG_LIST[round(percentage)];
   }
