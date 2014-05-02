@@ -7,7 +7,10 @@
 #define LCD_PIN 31
 #define NO_COLOR -10
 
-#define DEBUG 0
+#define DEBUG_COMMS 0
+#define DEBUG_MOTOR 0
+#define CHALLENGE_1 0             // Bots go one at a time 
+#define CHALLENGE_2 !CHALLENGE_1  // Bots go simultaneously
 
 
 /************************
@@ -247,9 +250,8 @@ void setup() {
 }
 
 void loop() {
-
-  //Serial.println(fol_color);
-  if(DEBUG)
+  
+  if(DEBUG_MOTOR)
     motor_duty_cycle = 0;
   
   // rx listen function
@@ -550,9 +552,9 @@ void handle_state()
   {
     if(millis() - finished_time < 400)
        set_action(ACTION_REVERSE);
-    else if(millis() - finished_time < 400 + 600)
+    else if(millis() - finished_time < 400 + 700)
        set_action(ACTION_PIVOT_CW);
-    else if(millis() - finished_time < 400 + 600 + 300)
+    else if(millis() - finished_time < 400 + 700 + 400)
        set_action(ACTION_REVERSE);
     else{
         set_action(ACTION_STOPPED);
@@ -914,19 +916,25 @@ void set_fol_color(int c_color)
   
   if(current_state != STATE_MASTER && current_state != STATE_SLAVE)
   {
-   // set_state(STATE_MASTER);
-   // tx_state = MASTER_STATE_BEGIN_HANDSHAKE;
+    if(!DEBUG_COMMS)
+    {
+      delay(100);
+      set_state(STATE_MASTER);
+      tx_state = MASTER_STATE_BEGIN_HANDSHAKE;
+    }
   }
   
 }
 
 void init_motor_control()
 {
+
   // Assign motor to proper pins
   pinMode(MOTOR_LEFT_F,  OUTPUT);
   pinMode(MOTOR_LEFT_R,  OUTPUT);
   pinMode(MOTOR_RIGHT_F, OUTPUT);
   pinMode(MOTOR_RIGHT_R, OUTPUT);
+
   
   // Set duty cycle to desired speed
   motor_duty_cycle = .32;  
@@ -1007,7 +1015,7 @@ void sense_rx(){
     {   
      
       // if we waited longer than one millisecond between each edge
-      if(millis() - last_rx_edge_time > 3)
+      if(millis() - last_rx_edge_time > 2)
       {
         // reset edge counter
          rx_edge_count = 0;
