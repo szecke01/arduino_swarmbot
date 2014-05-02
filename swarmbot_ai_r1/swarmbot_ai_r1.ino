@@ -7,7 +7,7 @@
 #define LCD_PIN 31
 #define NO_COLOR -10
 
-#define DEBUG 1
+#define DEBUG 0
 
 
 /************************
@@ -393,12 +393,12 @@ void handle_state()
     
     else
     {
-      if(millis() - last_search_time < 850)
+      if(millis() - last_search_time < 750)
       {
         // Turn clockwise
         set_action(ACTION_PIVOT_CW);
       }
-      else if(millis() - last_search_time < 850 + 1800)
+      else if(millis() - last_search_time < 750 + 1550)
       {
         // Turn counter-clockwise
         set_action(ACTION_PIVOT_CCW);
@@ -536,7 +536,7 @@ void handle_state()
     if(millis() - turn_arnd_time < 600)
       set_action(ACTION_REVERSE);
     
-    else if(millis() - turn_arnd_time < 1800)
+    else if(millis() - turn_arnd_time < 1550)
       set_action(ACTION_PIVOT_CW);
     
     else{
@@ -550,9 +550,9 @@ void handle_state()
   {
     if(millis() - finished_time < 400)
        set_action(ACTION_REVERSE);
-    else if(millis() - finished_time < 400 + 800)
+    else if(millis() - finished_time < 400 + 600)
        set_action(ACTION_PIVOT_CW);
-    else if(millis() - finished_time < 400 + 800 + 500)
+    else if(millis() - finished_time < 400 + 600 + 300)
        set_action(ACTION_REVERSE);
     else{
         set_action(ACTION_STOPPED);
@@ -914,8 +914,8 @@ void set_fol_color(int c_color)
   
   if(current_state != STATE_MASTER && current_state != STATE_SLAVE)
   {
-    set_state(STATE_MASTER);
-    tx_state = MASTER_STATE_BEGIN_HANDSHAKE;
+   // set_state(STATE_MASTER);
+   // tx_state = MASTER_STATE_BEGIN_HANDSHAKE;
   }
   
 }
